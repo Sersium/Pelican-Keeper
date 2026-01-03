@@ -60,36 +60,14 @@ public static class NetworkHelper
     }
 
     /// <summary>
-    /// Gets the IP to use for game server queries (internal allocation IP, not display IP).
-    /// When allocation IP is 0.0.0.0, queries the Docker host gateway to reach host-published ports.
+    /// Gets the IP to use for game server queries.
+    /// Uses external IP for query since direct container IPs may not be accessible.
     /// </summary>
     public static string GetQueryIp(ServerInfo serverInfo)
     {
-        var allocation = GetDefaultAllocation(serverInfo);
-        if (allocation == null)
-        {
-            return "N/A";
-        }
-
-        // If allocation IP is empty, invalid
-        if (string.IsNullOrEmpty(allocation.Ip))
-        {
-            return "N/A";
-        }
-
-        // If allocation IP is 0.0.0.0 (wildcard - server binding to all interfaces)
-        // Wings publishes container ports to the host (e.g., -p 50050:50050)
-        // From bot container, query the Docker host's gateway IP to reach these published ports
-        if (allocation.Ip == "0.0.0.0")
-        {
-            // On Linux, use the Docker bridge gateway IP (default: 172.17.0.1)
-            // This is the host's IP as seen from containers on the default bridge network
-            return "172.17.0.1";
-        }
-
-        // Use the allocation IP for queries (internal Docker network)
-        // Bot runs in Docker and queries game servers via internal network IPs
-        return allocation.Ip;
+        // Use the display IP (external IP) for queries
+        // This works with mcstatus.io API fallback when direct queries fail
+        return GetDisplayIp(serverInfo);
     }
 
     /// <summary>

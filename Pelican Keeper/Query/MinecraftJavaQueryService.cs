@@ -53,8 +53,38 @@ public sealed class MinecraftJavaQueryService : IQueryService
         }
         catch (Exception ex)
         {
-            // Log query failures for debugging
-            Logger.WriteLineWithStep($"Minecraft query failed for {Ip}:{Port}: {ex.GetType().Name}: {ex.Message}", Logger.Step.MinecraftJavaQuery);
+            // Direct query failed, try mcstatus.io API fallback
+            Logger.WriteLineWithStep($"Minecraft direct query failed for {Ip}:{Port}: {ex.GetType().Name}: {ex.Message}", Logger.Step.MinecraftJavaQuery);
+            Logger.WriteLineWithStep($"Attempting mcstatus.io API fallback for {Ip}:{Port}", Logger.Step.MinecraftJavaQuery);
+
+            return await QueryViaMcStatusApiAsync();
+        }
+    }
+
+    private async Task<string> QueryViaMcStatusApiAsync()
+    {
+        try
+        {
+            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            var response = await httpClient.GetStringAsync($"https://api.mcstatus.io/v2/status/java/{Ip}:{Port}");
+
+            // Parse JSON response: {"online":true,"players":{"online":0,"max":20}}
+            var onlineMatch = System.Text.RegularExpressions.Regex.Match(response, "\"online\":(\\d+)");
+            var maxMatch = System.Text.RegularExpressions.Regex.Match(response, "\"max\":(\\d+)");
+
+            if (onlineMatch.Success && maxMatch.Success)
+            {
+                var online = onlineMatch.Groups[1].Value;
+                var max = maxMatch.Groups[1].Value;
+                Logger.WriteLineWithStep($"mcstatus.io API returned: {online}/{max} for {Ip}:{Port}", Logger.Step.MinecraftJavaQuery);
+                return $"{online}/{max}";
+            }
+
+            return "N/A";
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteLineWithStep($"mcstatus.io API fallback failed for {Ip}:{Port}: {ex.Message}", Logger.Step.MinecraftJavaQuery);
             return "N/A";
         }
     }
