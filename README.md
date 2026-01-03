@@ -14,15 +14,6 @@ This fork focuses on reliability and production readiness:
 - **Better Testing**: Unit tests and CI/CD pipeline
 - **Easy Deployment**: Build scripts and importable Pelican egg
 
-**Developer Experience**
-
-- ✅ Comprehensive unit tests for all query services
-- ✅ Cross-platform build script (`build.sh`)
-- ✅ GitHub Actions CI/CD pipeline
-- ✅ Pelican Panel egg for easy deployment
-
-## Features
-
 ## Features
 
 - **Server Monitoring**: CPU, memory, disk, network, uptime tracking
@@ -135,19 +126,9 @@ Pelican Keeper/
 └── Utilities/      # Helpers, logging
 ```
 
-## Changelog
-
-See recent improvements in commit history:
-
-- v2.0.57: Pelican Panel boolean toggle support
-- v2.0.54: SkyFactory modpack SLP compatibility
-- v2.0.52: mcstatus.io API fallback
-- v2.0.47: Docker networking fixes
-- v2.0.42+: Comprehensive player count fixes
-
 ## License
 
-MIT License - see original repository for details.
+See [LICENSE](LICENSE) file for details.
 
 ## Credits
 
