@@ -61,7 +61,7 @@ public sealed class MinecraftJavaQueryService : IQueryService
         }
     }
 
-    private async Task<string> QueryViaMcStatusApiAsync()
+    public async Task<string> QueryViaMcStatusApiAsync()
     {
         try
         {

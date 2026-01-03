@@ -256,8 +256,17 @@ public static class ServerMonitorService
             Logger.WriteLineWithStep($"Querying Minecraft Java: {ip}:{port}", Logger.Step.MinecraftJavaQuery);
 
         using var service = new MinecraftJavaQueryService(ip, port);
-        service.ConnectAsync().GetAwaiter().GetResult();
-        server.PlayerCountText = service.QueryAsync().GetAwaiter().GetResult();
+        try
+        {
+            service.ConnectAsync().GetAwaiter().GetResult();
+            server.PlayerCountText = service.QueryAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            // Connection failed, try API fallback
+            Logger.WriteLineWithStep($"Minecraft direct connection failed: {ex.Message}, trying API fallback", Logger.Step.MinecraftJavaQuery);
+            server.PlayerCountText = service.QueryViaMcStatusApiAsync().GetAwaiter().GetResult();
+        }
     }
 
     private static void QueryMinecraftBedrockServer(ServerInfo server, string json, GamesToMonitor config, string ip)
