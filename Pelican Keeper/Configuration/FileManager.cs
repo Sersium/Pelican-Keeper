@@ -200,7 +200,12 @@ public static class FileManager
     /// </summary>
     private static void ApplyEnvironmentOverrides(Config config)
     {
-        static string? GetEnv(string key) => Environment.GetEnvironmentVariable(key);
+        static string? GetEnv(string key)
+        {
+            var val = Environment.GetEnvironmentVariable(key);
+            // Treat empty strings as null to avoid parsing errors
+            return string.IsNullOrWhiteSpace(val) ? null : val;
+        }
         static bool ParseBool(string? val)
         {
             if (val == null)
