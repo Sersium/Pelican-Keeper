@@ -172,7 +172,10 @@ public static class ServerMonitorService
         }
 
         if (RuntimeContext.Config.Debug)
-            Logger.WriteLineWithStep($"Querying {gameConfig.Protocol} server {server.Name} at {ip} (max: {maxPlayers})", Logger.Step.GameMonitoring);
+        {
+            var maxLabel = maxPlayers > 0 ? maxPlayers.ToString() : "unknown";
+            Logger.WriteLineWithStep($"Querying {gameConfig.Protocol} server {server.Name} at {ip} (max: {maxLabel})", Logger.Step.GameMonitoring);
+        }
 
         switch (gameConfig.Protocol)
         {
