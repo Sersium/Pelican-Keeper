@@ -1,60 +1,61 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <OutputType>Exe</OutputType>
-        <TargetFramework>net8.0</TargetFramework>
-        <RootNamespace>Pelican_Keeper</RootNamespace>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-        <PublishSingleFile>true</PublishSingleFile>
-        <SelfContained>true</SelfContained>
-        <DebugType>embedded</DebugType>
-        <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-        <IncludeAllContentForSelfExtract>false</IncludeAllContentForSelfExtract>
-        <RuntimeIdentifiers>win-x86;win-x64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
-    </PropertyGroup>
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Pelican_Keeper</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <DebugType>embedded</DebugType>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeAllContentForSelfExtract>false</IncludeAllContentForSelfExtract>
+    <RuntimeIdentifiers>win-x86;win-x64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
+    <Version>2.0.61</Version>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <PackageReference Include="DSharpPlus" Version="4.5.1"/>
-        <PackageReference Include="DSharpPlus.Interactivity" Version="4.5.1" />
-        <PackageReference Include="RestSharp" Version="112.1.0"/>
-        <PackageReference Include="System.Linq.Async" Version="6.0.3" />
-    </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="DSharpPlus" Version="4.5.1"/>
+    <PackageReference Include="DSharpPlus.Interactivity" Version="4.5.1" />
+    <PackageReference Include="RestSharp" Version="112.1.0"/>
+    <PackageReference Include="System.Linq.Async" Version="6.0.3" />
+  </ItemGroup>
 
-    <ItemGroup>
-        <None Update="Secrets.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-            <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-        </None>
-        <None Update="MessageHistory.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-            <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-        </None>
-        <None Update="Config.json">
-          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-            <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-        </None>
-        <None Update="MessageMarkdown.txt">
-          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-            <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-        </None>
-        <None Update="GamesToMonitor.json">
-          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-            <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-        </None>
-        <None Update="update.sh">
-          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-            <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-        </None>
-    </ItemGroup>
+  <ItemGroup>
+    <None Update="Secrets.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </None>
+    <None Update="MessageHistory.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </None>
+    <None Update="Config.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </None>
+    <None Update="MessageMarkdown.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </None>
+    <None Update="GamesToMonitor.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </None>
+    <None Update="update.sh">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </None>
+  </ItemGroup>
 
-    <ItemGroup>
-      <Content Include="..\.github\workflows\dotnet.yml">
-        <Link>dotnet.yml</Link>
-      </Content>
-      <Content Include="..\README.md">
-        <Link>README.md</Link>
-      </Content>
-    </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\.github\workflows\dotnet.yml">
+      <Link>dotnet.yml</Link>
+    </Content>
+    <Content Include="..\README.md">
+      <Link>README.md</Link>
+    </Content>
+  </ItemGroup>
 
 </Project>
