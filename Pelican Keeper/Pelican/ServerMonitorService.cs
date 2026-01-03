@@ -151,15 +151,7 @@ public static class ServerMonitorService
             return;
         }
 
-        if (RuntimeContext.Config.Debug)
-        {
-            var allVars = JsonResponseParser.ExtractAllVariables(json, server.Uuid);
-            var playerVars = allVars.Where(v => v.Key.Contains("PLAYER", StringComparison.OrdinalIgnoreCase) || v.Key.Contains("SLOT", StringComparison.OrdinalIgnoreCase)).ToList();
-            var display = playerVars.Count > 0
-                ? string.Join(", ", playerVars.Select(v => $"{v.Key}={v.Value}"))
-                : "(no PLAYER/SLOT vars found)";
-            Logger.WriteLineWithStep($"Variables for {server.Name}: {display}", Logger.Step.GameMonitoring);
-        }
+
 
         var maxPlayers = JsonResponseParser.ExtractMaxPlayerCount(json, server.Uuid, gameConfig.MaxPlayerVariable, gameConfig.MaxPlayer);
         // Use allocation IP for queries (bot runs in Docker, needs internal network IP to reach game servers)
@@ -171,11 +163,7 @@ public static class ServerMonitorService
             return;
         }
 
-        if (RuntimeContext.Config.Debug)
-        {
-            var maxLabel = maxPlayers > 0 ? maxPlayers.ToString() : "unknown";
-            Logger.WriteLineWithStep($"Querying {gameConfig.Protocol} server {server.Name} at {ip} (max: {maxLabel})", Logger.Step.GameMonitoring);
-        }
+
 
         switch (gameConfig.Protocol)
         {
