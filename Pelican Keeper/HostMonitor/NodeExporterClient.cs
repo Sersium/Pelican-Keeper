@@ -57,7 +57,7 @@ public static class NodeExporterClient
         var cpuIdle = 0.0;
         var cpuTotal = 0.0;
         var diskMounts = new Dictionary<string, DiskMount>();
-        string[] allowedFsTypes = ["overlay", "ext4", "xfs", "btrfs", "zfs", "apfs"];
+        string[] allowedFsTypes = new[] { "overlay", "ext4", "xfs", "btrfs", "zfs", "apfs" };
 
         foreach (var line in lines)
         {
@@ -96,8 +96,8 @@ public static class NodeExporterClient
             // Filesystem: node_filesystem_size_bytes{device="...",fstype="...",mountpoint="..."} value
             if (line.Contains("node_filesystem_size_bytes{"))
             {
-                var mountMatch = Regex.Match(line, @"mountpoint=\"([^\"]+)\"");
-                var fsMatch = Regex.Match(line, @"fstype=\"([^\"]+)\"");
+                var mountMatch = Regex.Match(line, @"mountpoint=""([^""]+)""");
+                var fsMatch = Regex.Match(line, @"fstype=""([^""]+)""");
                 var valueMatch = Regex.Match(line, @"node_filesystem_size_bytes\{[^}]+\}\s+([0-9.eE+-]+)");
 
                 if (mountMatch.Success && valueMatch.Success && double.TryParse(valueMatch.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
@@ -132,7 +132,7 @@ public static class NodeExporterClient
             // Filesystem available: node_filesystem_avail_bytes{mountpoint="..."} value
             if (line.Contains("node_filesystem_avail_bytes{"))
             {
-                var mountMatch = Regex.Match(line, @"mountpoint=\"([^\"]+)\"");
+                var mountMatch = Regex.Match(line, @"mountpoint=""([^""]+)""");
                 var valueMatch = Regex.Match(line, @"node_filesystem_avail_bytes\{[^}]+\}\s+([0-9.eE+-]+)");
 
                 if (mountMatch.Success && valueMatch.Success && double.TryParse(valueMatch.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
