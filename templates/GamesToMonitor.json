@@ -57,6 +57,11 @@
     "QueryPortVariable": "SERVER_PORT"
   },
   {
+    "Game": "Gregtech New Horizons 2.8.X",
+    "Protocol": "MinecraftJava",
+    "QueryPortVariable": "SERVER_PORT"
+  },
+  {
     "Game": "Forge Minecraft",
     "Protocol": "MinecraftJava",
     "QueryPortVariable": "SERVER_PORT"
