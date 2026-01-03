@@ -66,10 +66,12 @@ public sealed class MinecraftJavaQueryService : IQueryService
         try
         {
             using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-            var response = await httpClient.GetStringAsync($"https://api.mcstatus.io/v2/status/java/{Ip}:{Port}");
+            var url = $"https://api.mcstatus.io/v2/status/java/{Ip}:{Port}";
+            var response = await httpClient.GetStringAsync(url);
 
-            // Parse JSON response: {"online":true,"players":{"online":0,"max":20}}
-            var onlineMatch = System.Text.RegularExpressions.Regex.Match(response, "\"online\":(\\d+)");
+            // Parse JSON response to extract player counts from "players" object
+            // Example: "players":{"online":71,"max":100}
+            var onlineMatch = System.Text.RegularExpressions.Regex.Match(response, "\"players\":\\s*\\{[^}]*\"online\":(\\d+)");
             var maxMatch = System.Text.RegularExpressions.Regex.Match(response, "\"max\":(\\d+)");
 
             if (onlineMatch.Success && maxMatch.Success)
@@ -80,6 +82,7 @@ public sealed class MinecraftJavaQueryService : IQueryService
                 return $"{online}/{max}";
             }
 
+            Logger.WriteLineWithStep($"mcstatus.io API response invalid for {Ip}:{Port}", Logger.Step.MinecraftJavaQuery);
             return "N/A";
         }
         catch (Exception ex)
