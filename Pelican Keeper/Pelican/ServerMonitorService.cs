@@ -142,8 +142,8 @@ public static class ServerMonitorService
         if (gameConfig == null) return;
 
         var maxPlayers = JsonResponseParser.ExtractMaxPlayerCount(json, server.Uuid, gameConfig.MaxPlayerVariable, gameConfig.MaxPlayer);
-        // Use the internal allocation IP for querying (bot runs in Docker, needs internal network access)
-        var ip = NetworkHelper.GetQueryIp(server);
+        // Use display IP for queries (works for both internal and external connectivity)
+        var ip = NetworkHelper.GetDisplayIp(server);
         if (ip == "N/A") return;
 
         switch (gameConfig.Protocol)

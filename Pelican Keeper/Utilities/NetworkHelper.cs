@@ -60,23 +60,6 @@ public static class NetworkHelper
     }
 
     /// <summary>
-    /// Gets the IP address to use for querying a server (internal allocation IP).
-    /// This is the IP the bot can actually connect to from within Docker.
-    /// </summary>
-    public static string GetQueryIp(ServerInfo serverInfo)
-    {
-        var allocation = GetDefaultAllocation(serverInfo);
-        if (allocation == null)
-        {
-            return "N/A";
-        }
-
-        // For queries, use the allocation's actual IP (internal Docker/network IP)
-        // The bot runs in Docker and needs to connect to other containers via internal network
-        return allocation.Ip;
-    }
-
-    /// <summary>
     /// Checks if an IP matches the internal network pattern.
     /// </summary>
     public static bool IsInternalIp(string ip)

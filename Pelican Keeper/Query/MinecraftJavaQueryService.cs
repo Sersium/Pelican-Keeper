@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 using System.Text;
+using Pelican_Keeper.Utilities;
 
 namespace Pelican_Keeper.Query;
 
@@ -50,8 +51,10 @@ public sealed class MinecraftJavaQueryService : IQueryService
             var response = await ReadResponseAsync();
             return ParsePlayerCount(response);
         }
-        catch
+        catch (Exception ex)
         {
+            // Log query failures for debugging
+            Logger.WriteLineWithStep($"Minecraft query failed for {Ip}:{Port}: {ex.GetType().Name}", Logger.Step.MinecraftJavaQuery);
             return "N/A";
         }
     }
