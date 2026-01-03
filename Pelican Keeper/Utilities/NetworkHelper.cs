@@ -61,7 +61,7 @@ public static class NetworkHelper
 
     /// <summary>
     /// Gets the IP to use for game server queries (internal allocation IP, not display IP).
-    /// When bot uses host networking and allocation IP is 0.0.0.0, queries via localhost.
+    /// When allocation IP is 0.0.0.0, queries the Docker host gateway to reach host-published ports.
     /// </summary>
     public static string GetQueryIp(ServerInfo serverInfo)
     {
@@ -78,11 +78,13 @@ public static class NetworkHelper
         }
 
         // If allocation IP is 0.0.0.0 (wildcard - server binding to all interfaces)
-        // and bot is running with host networking, query via localhost
-        // Wings maps container ports to host, so localhost:<port> reaches the game server
+        // Wings publishes container ports to the host (e.g., -p 50050:50050)
+        // From bot container, query the Docker host's gateway IP to reach these published ports
         if (allocation.Ip == "0.0.0.0")
         {
-            return "127.0.0.1";
+            // Try host.docker.internal first (Docker Desktop / newer Docker versions)
+            // Otherwise use common Docker bridge gateway: 172.17.0.1
+            return "host.docker.internal";
         }
 
         // Use the allocation IP for queries (internal Docker network)
