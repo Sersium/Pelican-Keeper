@@ -51,7 +51,6 @@ public class EmbedBuilderService
     {
         var embed = new DiscordEmbedBuilder
         {
-            Title = "📡 Game Server Status Overview",
             Color = DiscordColor.Azure
         };
 
