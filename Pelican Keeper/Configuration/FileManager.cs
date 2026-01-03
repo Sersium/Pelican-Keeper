@@ -200,24 +200,20 @@ public static class FileManager
     /// </summary>
     private static void ApplyEnvironmentOverrides(Config config)
     {
-        static string? GetEnv(string key)
-        {
-            var val = Environment.GetEnvironmentVariable(key);
-            // Treat empty strings as null to avoid parsing errors
-            return string.IsNullOrWhiteSpace(val) ? null : val;
-        }
+        static string? GetEnv(string key) => Environment.GetEnvironmentVariable(key);
         static bool ParseBool(string? val)
         {
             if (val == null)
                 throw new System.ArgumentNullException(nameof(val), "Boolean environment value cannot be null.");
 
+            // Pelican Panel toggles: ON=1, OFF=empty string
             if (val == "1" || val.Equals("true", StringComparison.OrdinalIgnoreCase))
                 return true;
 
-            if (val == "0" || val.Equals("false", StringComparison.OrdinalIgnoreCase))
+            if (val == "0" || val.Equals("false", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(val))
                 return false;
 
-            throw new System.FormatException($"Invalid boolean value for environment override: '{val}'. Expected '1', '0', 'true', or 'false'.");
+            throw new System.FormatException($"Invalid boolean value for environment override: '{val}'. Expected '1', '0', 'true', 'false', or empty string.");
         }
         string? val;
 
