@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Pelican_Keeper.Utilities;
 
@@ -56,6 +57,7 @@ public static class NodeExporterClient
         var cpuIdle = 0.0;
         var cpuTotal = 0.0;
         var diskMounts = new Dictionary<string, DiskMount>();
+        string[] allowedFsTypes = ["overlay", "ext4", "xfs", "btrfs", "zfs", "apfs"];
 
         foreach (var line in lines)
         {
@@ -63,53 +65,61 @@ public static class NodeExporterClient
             if (line.StartsWith('#'))
                 continue;
 
-            // CPU metrics: node_cpu_seconds_total{mode="idle"} value
-            if (line.Contains("node_cpu_seconds_total") && line.Contains("mode=\"idle\""))
+            // CPU metrics: sum all modes; track idle separately
+            if (line.Contains("node_cpu_seconds_total"))
             {
-                var match = Regex.Match(line, @"node_cpu_seconds_total\{[^}]*\}\s+([\d.]+)");
-                if (match.Success && double.TryParse(match.Groups[1].Value, out var value))
-                    cpuIdle += value;
-            }
-            else if (line.Contains("node_cpu_seconds_total"))
-            {
-                var match = Regex.Match(line, @"node_cpu_seconds_total\{[^}]*\}\s+([\d.]+)");
-                if (match.Success && double.TryParse(match.Groups[1].Value, out var value))
+                var match = Regex.Match(line, @"node_cpu_seconds_total\{[^}]*\}\s+([0-9.eE+-]+)");
+                if (match.Success && double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+                {
                     cpuTotal += value;
+                    if (line.Contains("mode=\"idle\""))
+                        cpuIdle += value;
+                }
             }
 
             // Memory: node_memory_MemTotal_bytes value
             if (line.StartsWith("node_memory_MemTotal_bytes "))
             {
-                var match = Regex.Match(line, @"node_memory_MemTotal_bytes\s+([\d.e+]+)");
-                if (match.Success && ulong.TryParse(match.Groups[1].Value.Split('.')[0], out var bytes))
-                    metrics.MemoryTotalBytes = bytes;
+                var match = Regex.Match(line, @"node_memory_MemTotal_bytes\s+([0-9.eE+-]+)");
+                if (match.Success && double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+                    metrics.MemoryTotalBytes = (ulong)Math.Max(0, value);
             }
 
             // Available memory: node_memory_MemAvailable_bytes value
             if (line.StartsWith("node_memory_MemAvailable_bytes "))
             {
-                var match = Regex.Match(line, @"node_memory_MemAvailable_bytes\s+([\d.e+]+)");
-                if (match.Success && ulong.TryParse(match.Groups[1].Value.Split('.')[0], out var bytes))
-                    metrics.MemoryAvailableBytes = bytes;
+                var match = Regex.Match(line, @"node_memory_MemAvailable_bytes\s+([0-9.eE+-]+)");
+                if (match.Success && double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+                    metrics.MemoryAvailableBytes = (ulong)Math.Max(0, value);
             }
 
             // Filesystem: node_filesystem_size_bytes{device="...",fstype="...",mountpoint="..."} value
             if (line.Contains("node_filesystem_size_bytes{"))
             {
-                var mountMatch = Regex.Match(line, @"mountpoint=""([^""]+)""");
-                var fsMatch = Regex.Match(line, @"fstype=""([^""]+)""");
-                var valueMatch = Regex.Match(line, @"node_filesystem_size_bytes\{[^}]+\}\s+([\d.e+]+)");
+                var mountMatch = Regex.Match(line, @"mountpoint=\"([^\"]+)\"");
+                var fsMatch = Regex.Match(line, @"fstype=\"([^\"]+)\"");
+                var valueMatch = Regex.Match(line, @"node_filesystem_size_bytes\{[^}]+\}\s+([0-9.eE+-]+)");
 
-                if (mountMatch.Success && valueMatch.Success && ulong.TryParse(valueMatch.Groups[1].Value.Split('.')[0], out var bytes))
+                if (mountMatch.Success && valueMatch.Success && double.TryParse(valueMatch.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
                 {
                     var mountpoint = mountMatch.Groups[1].Value;
+                    var fsType = fsMatch.Success ? fsMatch.Groups[1].Value : string.Empty;
+
+                    // Skip pseudo / ephemeral mounts and tiny bind mounts like /etc/hosts
+                    if (mountpoint.StartsWith("/proc") || mountpoint.StartsWith("/sys") || mountpoint.StartsWith("/dev") || mountpoint.StartsWith("/run") || mountpoint.StartsWith("/etc/"))
+                        continue;
+                    if (allowedFsTypes.Length > 0 && !allowedFsTypes.Contains(fsType))
+                        continue;
+
+                    var bytes = (ulong)Math.Max(0, value);
+
                     if (!diskMounts.ContainsKey(mountpoint))
                     {
                         diskMounts[mountpoint] = new DiskMount
                         {
                             MountPoint = mountpoint,
                             TotalBytes = bytes,
-                            FilesystemType = fsMatch.Success ? fsMatch.Groups[1].Value : null
+                            FilesystemType = fsType
                         };
                     }
                     else
@@ -122,29 +132,45 @@ public static class NodeExporterClient
             // Filesystem available: node_filesystem_avail_bytes{mountpoint="..."} value
             if (line.Contains("node_filesystem_avail_bytes{"))
             {
-                var mountMatch = Regex.Match(line, @"mountpoint=""([^""]+)""");
-                var valueMatch = Regex.Match(line, @"node_filesystem_avail_bytes\{[^}]+\}\s+([\d.e+]+)");
+                var mountMatch = Regex.Match(line, @"mountpoint=\"([^\"]+)\"");
+                var valueMatch = Regex.Match(line, @"node_filesystem_avail_bytes\{[^}]+\}\s+([0-9.eE+-]+)");
 
-                if (mountMatch.Success && valueMatch.Success && ulong.TryParse(valueMatch.Groups[1].Value.Split('.')[0], out var bytes))
+                if (mountMatch.Success && valueMatch.Success && double.TryParse(valueMatch.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
                 {
                     var mountpoint = mountMatch.Groups[1].Value;
                     if (!diskMounts.ContainsKey(mountpoint))
                     {
-                        diskMounts[mountpoint] = new DiskMount { MountPoint = mountpoint };
+                        // Skip if size was filtered out earlier
+                        continue;
                     }
-                    diskMounts[mountpoint].AvailableBytes = bytes;
+                    diskMounts[mountpoint].AvailableBytes = (ulong)Math.Max(0, value);
                 }
             }
         }
 
-        // Calculate CPU usage percentage
+        // Calculate CPU usage percentage using idle vs total time
         if (cpuTotal > 0)
         {
             var usage = (cpuTotal - cpuIdle) / cpuTotal * 100;
-            metrics.CpuUsagePercent = Math.Min(100, Math.Max(0, usage));
+            metrics.CpuUsagePercent = Math.Clamp(usage, 0, 100);
+        }
+        else
+        {
+            metrics.IsValid = false;
+            metrics.ErrorMessage = "No CPU metrics parsed";
         }
 
-        // Add mounts, sorted by mount point
-        metrics.Mounts = diskMounts.Values.OrderBy(m => m.MountPoint).ToList();
+        // Add mounts, removing entries with zero sizes
+        metrics.Mounts = diskMounts.Values
+            .Where(m => m.TotalBytes > 0)
+            .OrderBy(m => m.MountPoint)
+            .ToList();
+
+        // Mark invalid if critical parts missing
+        if (metrics.MemoryTotalBytes == 0)
+        {
+            metrics.IsValid = false;
+            metrics.ErrorMessage = metrics.ErrorMessage ?? "No memory metrics parsed";
+        }
     }
 }
