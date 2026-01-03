@@ -4,6 +4,7 @@ using DSharpPlus.EventArgs;
 using Pelican_Keeper.Configuration;
 using Pelican_Keeper.Core;
 using Pelican_Keeper.Discord;
+using Pelican_Keeper.HostMonitor;
 using Pelican_Keeper.Pelican;
 using Pelican_Keeper.Updates;
 using Pelican_Keeper.Utilities;
@@ -43,6 +44,7 @@ public static class Program
         await FileManager.ReadConfigFileAsync();
         await EnsureMarkdownFileAsync();
         await ServerMonitorService.InitializeAsync();
+        FileManager.InitializeHostMetricsConfig();
     }
 
     private static async Task EnsureMarkdownFileAsync()
@@ -127,6 +129,17 @@ public static class Program
             }
         }
 
+        // Resolve host metrics channel if configured
+        if (RuntimeContext.Secrets.HostMetricsChannelId.HasValue)
+        {
+            var metricsChannel = await sender.GetChannelAsync(RuntimeContext.Secrets.HostMetricsChannelId.Value);
+            if (metricsChannel != null)
+            {
+                RuntimeContext.HostMetricsChannel = metricsChannel;
+                Logger.WriteLineWithStep($"Host metrics channel: {metricsChannel.Name}", Logger.Step.Discord);
+            }
+        }
+
         // Send update notification now that channels are available
         if (VersionUpdater.UpdateAvailable && RuntimeContext.Config.NotifyOnUpdate)
         {
@@ -140,6 +153,7 @@ public static class Program
         }
 
         StartStatsUpdater(sender);
+        StartHostMetricsUpdater();
         VersionUpdater.StartPeriodicUpdateCheck(TimeSpan.FromHours(24));
     }
 
@@ -385,5 +399,48 @@ public static class Program
                 await Task.Delay(TimeSpan.FromSeconds(delay));
             }
         });
+    }
+
+    private static void StartHostMetricsUpdater()
+    {
+        if (RuntimeContext.HostMetricsChannel == null)
+            return;
+
+        Logger.WriteLineWithStep("Host metrics updater started (3s interval)", Logger.Step.Initialization);
+
+        ulong? hostMetricsMessageId = null;
+
+        StartUpdaterLoop(async () =>
+        {
+            try
+            {
+                var metrics = await HostMetricsService.GetMetricsAsync();
+                var embed = await EmbedService.BuildHostMetricsEmbedAsync(metrics);
+
+                if (hostMetricsMessageId.HasValue)
+                {
+                    try
+                    {
+                        var msg = await RuntimeContext.HostMetricsChannel.GetMessageAsync(hostMetricsMessageId.Value);
+                        await msg.ModifyAsync(m => m.Embed = embed);
+                    }
+                    catch
+                    {
+                        // Message deleted, create new one
+                        var newMsg = await RuntimeContext.HostMetricsChannel.SendMessageAsync(embed);
+                        hostMetricsMessageId = newMsg.Id;
+                    }
+                }
+                else
+                {
+                    var newMsg = await RuntimeContext.HostMetricsChannel.SendMessageAsync(embed);
+                    hostMetricsMessageId = newMsg.Id;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.WriteLineWithStep($"Host metrics update failed: {ex.Message}", Logger.Step.EmbedBuilding, Logger.OutputType.Error);
+            }
+        }, delaySeconds: 3);
     }
 }

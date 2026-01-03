@@ -10,6 +10,7 @@ namespace Pelican_Keeper.Models;
 /// <param name="ChannelIds">Discord channel IDs where status messages are posted.</param>
 /// <param name="NotificationChannelId">Discord channel ID for update notifications (optional, defaults to first status channel).</param>
 /// <param name="ExternalServerIp">Public IP to display for internal servers.</param>
+/// <param name="HostMetricsChannelId">Discord channel ID for host system metrics display (optional).</param>
 public record Secrets(
     string? ClientToken,
     string? ServerToken,
@@ -17,5 +18,6 @@ public record Secrets(
     string? BotToken,
     ulong[]? ChannelIds,
     ulong? NotificationChannelId,
-    string? ExternalServerIp
+    string? ExternalServerIp,
+    ulong? HostMetricsChannelId
 );

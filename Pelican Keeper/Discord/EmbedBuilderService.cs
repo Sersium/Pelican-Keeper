@@ -2,6 +2,7 @@ using DSharpPlus.Entities;
 using Pelican_Keeper.Core;
 using Pelican_Keeper.Models;
 using Pelican_Keeper.Utilities;
+using Pelican_Keeper.HostMonitor;
 
 namespace Pelican_Keeper.Discord;
 
@@ -120,6 +121,56 @@ public class EmbedBuilderService
         return Task.FromResult(embeds);
     }
 
+    /// <summary>
+    /// Builds an embed displaying host system metrics.
+    /// </summary>
+    public Task<DiscordEmbed> BuildHostMetricsEmbedAsync(HostMetrics metrics)
+    {
+        var embed = new DiscordEmbedBuilder
+        {
+            Title = "🖥️ Host System Metrics",
+            Color = DiscordColor.Cyan
+        };
+
+        if (!metrics.IsValid)
+        {
+            embed.AddField("Status", $"⚠️ Error: {metrics.ErrorMessage}", inline: false);
+        }
+        else
+        {
+            // CPU
+            var cpuBar = BuildProgressBar(metrics.CpuUsagePercent);
+            embed.AddField("CPU Usage", $"{cpuBar} {metrics.CpuUsagePercent:0.0}%", inline: false);
+
+            // Memory
+            var memUsedGb = metrics.MemoryUsedBytes / (1024.0 * 1024.0 * 1024.0);
+            var memTotalGb = metrics.MemoryTotalBytes / (1024.0 * 1024.0 * 1024.0);
+            var memPercent = (double)metrics.MemoryUsedBytes / metrics.MemoryTotalBytes * 100;
+            var memBar = BuildProgressBar(memPercent);
+            embed.AddField("Memory", $"{memBar} {memUsedGb:0.00} GB / {memTotalGb:0.00} GB ({memPercent:0.0}%)", inline: false);
+
+            // Disk mounts
+            if (metrics.Mounts.Count > 0)
+            {
+                var diskInfo = string.Join("\n", metrics.Mounts.Select(m =>
+                {
+                    var bar = BuildProgressBar(m.UsagePercent);
+                    var usedStr = HostMetricsService.FormatBytes(m.UsedBytes);
+                    var totalStr = HostMetricsService.FormatBytes(m.TotalBytes);
+                    return $"{m.MountPoint}: {bar} {usedStr} / {totalStr} ({m.UsagePercent:0.0}%)";
+                }));
+                embed.AddField("Storage", diskInfo, inline: false);
+            }
+        }
+
+        embed.Footer = new DiscordEmbedBuilder.EmbedFooter
+        {
+            Text = $"Last Updated: {DateTime.Now:HH:mm:ss}"
+        };
+
+        return Task.FromResult(embed.Build());
+    }
+
     private static int GetEmbedCharacterCount(DiscordEmbedBuilder embed)
     {
         var count = 0;
@@ -133,5 +184,13 @@ public class EmbedBuilderService
             count += field.Value?.Length ?? 0;
         }
         return count;
+    }
+
+    private static string BuildProgressBar(double percent, int width = 10)
+    {
+        var filled = (int)(percent / 100 * width);
+        var empty = width - filled;
+        var bar = new string('█', filled) + new string('░', empty);
+        return $"[{bar}]";
     }
 }

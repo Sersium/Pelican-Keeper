@@ -276,7 +276,7 @@ public static class FileManager
     private static Secrets ApplySecretsEnvironmentOverrides(Secrets? secrets)
     {
         // Create default if null - allows full configuration via environment variables
-        secrets ??= new Secrets(null, null, null, null, null, null, null);
+        secrets ??= new Secrets(null, null, null, null, null, null, null, null);
 
         static string? GetEnv(string key) => Environment.GetEnvironmentVariable(key);
         static ulong[]? ParseUlongArray(string? v) =>
@@ -297,7 +297,18 @@ public static class FileManager
             BotToken = GetEnv("BotToken") ?? GetEnv("BOT_TOKEN") ?? secrets.BotToken,
             ChannelIds = ParseUlongArray(GetEnv("ChannelIds") ?? GetEnv("CHANNEL_IDS")) ?? secrets.ChannelIds,
             NotificationChannelId = ParseUlong(GetEnv("NotificationChannelId") ?? GetEnv("NOTIFICATION_CHANNEL_ID")) ?? secrets.NotificationChannelId,
-            ExternalServerIp = GetEnv("ExternalServerIp") ?? GetEnv("EXTERNAL_SERVER_IP") ?? secrets.ExternalServerIp
+            ExternalServerIp = GetEnv("ExternalServerIp") ?? GetEnv("EXTERNAL_SERVER_IP") ?? secrets.ExternalServerIp,
+            HostMetricsChannelId = ParseUlong(GetEnv("HostMetricsChannelId") ?? GetEnv("HOST_METRICS_CHANNEL_ID")) ?? secrets.HostMetricsChannelId
         };
+    }
+
+    /// <summary>
+    /// Initializes host metrics configuration from environment variables.
+    /// </summary>
+    public static void InitializeHostMetricsConfig()
+    {
+        RuntimeContext.HostMetricsUrl = Environment.GetEnvironmentVariable("NODE_EXPORTER_URL") ?? "http://node-exporter:9100/metrics";
+
+        Logger.WriteLineWithStep($"Host metrics endpoint: {RuntimeContext.HostMetricsUrl}", Logger.Step.Initialization);
     }
 }

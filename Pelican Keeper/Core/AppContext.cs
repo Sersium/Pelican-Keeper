@@ -20,6 +20,16 @@ public static class RuntimeContext
     public static DiscordChannel? NotificationChannel { get; set; }
 
     /// <summary>
+    /// Discord channel for host system metrics display.
+    /// </summary>
+    public static DiscordChannel? HostMetricsChannel { get; set; }
+
+    /// <summary>
+    /// Node-exporter metrics endpoint URL.
+    /// </summary>
+    public static string? HostMetricsUrl { get; set; }
+
+    /// <summary>
     /// API credentials and connection settings.
     /// </summary>
     public static Secrets Secrets { get; set; } = null!;

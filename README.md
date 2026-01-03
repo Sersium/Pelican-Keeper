@@ -104,6 +104,17 @@ Configuration is done entirely via **environment variables** (no JSON files need
 - `DEBUG` - Verbose logging: `1`/`0` (default: `false`)
 - `NOTIFICATION_CHANNEL_ID` - Optional notification channel ID
 
+**Host Metrics Monitoring (requires node-exporter container):**
+
+- `HOST_METRICS_CHANNEL_ID` - Discord channel ID for host system metrics display (CPU, RAM, disk usage)
+- `NODE_EXPORTER_URL` - Node-exporter Prometheus metrics endpoint (default: `http://node-exporter:9100/metrics`)
+
+**Note on NODE_EXPORTER_URL:** If the bot container cannot reach `node-exporter` at the default URL, you may need to:
+
+- Use the host IP address if running outside the same Docker compose network
+- Configure Docker networking to allow container-to-host communication  
+- Check that node-exporter is running and accessible from the bot's container network
+
 **Note:** Pelican Panel toggle values use `1` for ON, empty string for OFF.
 
 ## Game Server Queries
@@ -115,6 +126,7 @@ Supported protocols:
 - **Source Games**: A2S (Valve Source Query)
 - **Terraria**: RCON
 - **Custom**: Extendable via `IQueryService`
+- **Host Metrics**: CPU usage, RAM usage, storage disk/mount capacity (via node-exporter Prometheus endpoint)
 
 Configure game types in `GamesToMonitor.json`.
 
