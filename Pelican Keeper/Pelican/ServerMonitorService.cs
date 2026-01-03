@@ -132,19 +132,37 @@ public static class ServerMonitorService
         if (gameConfig == null)
         {
             var tags = server.Egg.Tags.Select(t => t.ToLowerInvariant()).ToList();
+            if (RuntimeContext.Config.Debug)
+                Logger.WriteLineWithStep($"No exact match for '{server.Egg.Name}'. Tags: {string.Join(", ", tags)}", Logger.Step.GameMonitoring);
+
             if (tags.Contains("minecraft") || tags.Any(t => t.Contains("minecraft")))
             {
                 // Use Minecraft Java Generic fallback config
                 gameConfig = _gamesToMonitor.FirstOrDefault(g => g.Game == "Minecraft Java (Generic)");
+                if (RuntimeContext.Config.Debug && gameConfig != null)
+                    Logger.WriteLineWithStep($"Using fallback config: Minecraft Java (Generic)", Logger.Step.GameMonitoring);
             }
         }
 
-        if (gameConfig == null) return;
+        if (gameConfig == null)
+        {
+            if (RuntimeContext.Config.Debug)
+                Logger.WriteLineWithStep($"No query config found for server '{server.Name}' (egg: {server.Egg.Name})", Logger.Step.GameMonitoring);
+            return;
+        }
 
         var maxPlayers = JsonResponseParser.ExtractMaxPlayerCount(json, server.Uuid, gameConfig.MaxPlayerVariable, gameConfig.MaxPlayer);
         // Use display IP for queries (works for both internal and external connectivity)
         var ip = NetworkHelper.GetDisplayIp(server);
-        if (ip == "N/A") return;
+        if (ip == "N/A")
+        {
+            if (RuntimeContext.Config.Debug)
+                Logger.WriteLineWithStep($"No valid IP for server '{server.Name}'", Logger.Step.GameMonitoring);
+            return;
+        }
+
+        if (RuntimeContext.Config.Debug)
+            Logger.WriteLineWithStep($"Querying {gameConfig.Protocol} server {server.Name} at {ip} (max: {maxPlayers})", Logger.Step.GameMonitoring);
 
         switch (gameConfig.Protocol)
         {
@@ -207,7 +225,22 @@ public static class ServerMonitorService
     private static void QueryMinecraftJavaServer(ServerInfo server, string json, GamesToMonitor config, string ip)
     {
         var port = JsonResponseParser.ExtractQueryPort(json, server.Uuid, config.QueryPortVariable);
-        if (port == 0 || string.IsNullOrEmpty(RuntimeContext.Secrets.ExternalServerIp)) return;
+        if (port == 0)
+        {
+            if (RuntimeContext.Config.Debug)
+                Logger.WriteLineWithStep($"No query port found for {server.Name}", Logger.Step.MinecraftJavaQuery);
+            return;
+        }
+
+        if (string.IsNullOrEmpty(RuntimeContext.Secrets.ExternalServerIp))
+        {
+            if (RuntimeContext.Config.Debug)
+                Logger.WriteLineWithStep($"ExternalServerIp not configured", Logger.Step.MinecraftJavaQuery);
+            return;
+        }
+
+        if (RuntimeContext.Config.Debug)
+            Logger.WriteLineWithStep($"Querying Minecraft Java: {ip}:{port}", Logger.Step.MinecraftJavaQuery);
 
         using var service = new MinecraftJavaQueryService(ip, port);
         service.ConnectAsync().GetAwaiter().GetResult();
