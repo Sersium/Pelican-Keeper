@@ -154,11 +154,17 @@ public sealed class MinecraftJavaQueryService : IQueryService
 
     private static string ParsePlayerCount(string json)
     {
-        Logger.WriteLineWithStep($"Parsing SLP response (first 200 chars): {json.Substring(0, Math.Min(200, json.Length))}", Logger.Step.MinecraftJavaQuery);
+        Logger.WriteLineWithStep($"Parsing SLP response (length: {json.Length} chars)", Logger.Step.MinecraftJavaQuery);
+        Logger.WriteLineWithStep($"Full SLP JSON: {json}", Logger.Step.MinecraftJavaQuery);
+
+        // Check if "players" field exists in the JSON
+        var containsPlayers = json.Contains("\"players\"");
+        Logger.WriteLineWithStep($"JSON contains 'players' field: {containsPlayers}", Logger.Step.MinecraftJavaQuery);
 
         var playersMatch = System.Text.RegularExpressions.Regex.Match(json, @"""players"":\{[^}]*""online"":(\d+)[^}]*""max"":(\d+)");
         if (!playersMatch.Success)
         {
+            Logger.WriteLineWithStep("First regex pattern failed, trying alternate pattern", Logger.Step.MinecraftJavaQuery);
             playersMatch = System.Text.RegularExpressions.Regex.Match(json, @"""online"":(\d+).*?""max"":(\d+)");
         }
 
