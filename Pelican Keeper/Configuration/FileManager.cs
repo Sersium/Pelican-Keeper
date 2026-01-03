@@ -239,11 +239,15 @@ public static class FileManager
 
         // Debug - log the raw environment value for troubleshooting
         var debugEnv = GetEnv("Debug");
-        Console.WriteLine($"[Env Check] Debug environment variable: '{debugEnv}' (null: {debugEnv == null})");
-        if (debugEnv != null)
+        Console.WriteLine($"[Env Check] Debug environment variable: '{debugEnv}' (null: {debugEnv == null}, empty: {string.IsNullOrWhiteSpace(debugEnv)})");
+        if (!string.IsNullOrWhiteSpace(debugEnv))
         {
             config.Debug = ParseBool(debugEnv);
             Console.WriteLine($"[Env Check] Parsed Debug value: {config.Debug}");
+        }
+        else
+        {
+            Console.WriteLine($"[Env Check] Debug not set or empty, using default: {config.Debug}");
         }
 
         if ((val = GetEnv("DryRun")) != null) config.DryRun = ParseBool(val);

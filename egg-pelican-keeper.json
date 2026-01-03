@@ -329,13 +329,14 @@
         },
         {
             "name": "⚙️ Debug Mode",
-            "description": "Enable verbose logging for troubleshooting",
+            "description": "Enable verbose logging for troubleshooting (1=enabled, 0=disabled)",
             "env_variable": "Debug",
-            "default_value": "0",
+            "default_value": "1",
             "user_viewable": true,
             "user_editable": true,
             "rules": [
-                "boolean"
+                "required",
+                "in:0,1"
             ],
             "sort": 23
         },
