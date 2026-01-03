@@ -116,6 +116,32 @@
             "sort": 5
         },
         {
+            "name": "🖥️ Host Metrics Channel ID",
+            "description": "Discord channel ID for displaying host system metrics (CPU, RAM, disk usage)",
+            "env_variable": "HOST_METRICS_CHANNEL_ID",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "string",
+                "nullable"
+            ],
+            "sort": 5.5
+        },
+        {
+            "name": "🖥️ Node Exporter URL",
+            "description": "Node-exporter Prometheus metrics endpoint (default: http://node-exporter:9100/metrics)",
+            "env_variable": "NODE_EXPORTER_URL",
+            "default_value": "http://node-exporter:9100/metrics",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": [
+                "string",
+                "nullable"
+            ],
+            "sort": 5.6
+        },
+        {
             "name": "🎨 Display Format",
             "description": "How servers are displayed: Consolidated (dropdown), PerServer (separate embeds), Paginated (pages)",
             "env_variable": "MessageFormat",
