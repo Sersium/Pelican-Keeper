@@ -23,9 +23,15 @@ public static class Program
     /// </summary>
     public static async Task Main()
     {
-        Logger.WriteLineWithStep("Starting Pelican Keeper...", Logger.Step.Initialization);
+        Logger.WriteLineWithStep($"Starting Pelican Keeper v{RuntimeContext.Version}...", Logger.Step.Initialization);
 
         await InitializeConfigurationAsync();
+
+        // Log configuration status
+        Logger.WriteLineWithStep($"Debug mode: {RuntimeContext.Config.Debug}", Logger.Step.Initialization);
+        Logger.WriteLineWithStep($"Auto-update: {RuntimeContext.Config.AutoUpdate}", Logger.Step.Initialization);
+        Logger.WriteLineWithStep($"Player count display: {RuntimeContext.Config.PlayerCountDisplay}", Logger.Step.Initialization);
+
         await InitializeServicesAsync();
         await CheckForUpdatesAsync();
         await StartDiscordClientAsync();

@@ -236,7 +236,16 @@ public static class FileManager
         // Support both AutoUpdate and AUTO_UPDATE (Pelican egg convention)
         if ((val = GetEnv("AutoUpdate") ?? GetEnv("AUTO_UPDATE")) != null) config.AutoUpdate = ParseBool(val);
         if ((val = GetEnv("NotifyOnUpdate")) != null) config.NotifyOnUpdate = ParseBool(val);
-        if ((val = GetEnv("Debug")) != null) config.Debug = ParseBool(val);
+
+        // Debug - log the raw environment value for troubleshooting
+        var debugEnv = GetEnv("Debug");
+        Console.WriteLine($"[Env Check] Debug environment variable: '{debugEnv}' (null: {debugEnv == null})");
+        if (debugEnv != null)
+        {
+            config.Debug = ParseBool(debugEnv);
+            Console.WriteLine($"[Env Check] Parsed Debug value: {config.Debug}");
+        }
+
         if ((val = GetEnv("DryRun")) != null) config.DryRun = ParseBool(val);
         if ((val = GetEnv("LimitServerCount")) != null) config.LimitServerCount = ParseBool(val);
         if ((val = GetEnv("ContinuesMarkdownRead")) != null) config.ContinuesMarkdownRead = ParseBool(val);
