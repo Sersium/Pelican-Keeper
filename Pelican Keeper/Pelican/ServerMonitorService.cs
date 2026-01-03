@@ -151,6 +151,16 @@ public static class ServerMonitorService
             return;
         }
 
+        if (RuntimeContext.Config.Debug)
+        {
+            var allVars = JsonResponseParser.ExtractAllVariables(json, server.Uuid);
+            var playerVars = allVars.Where(v => v.Key.Contains("PLAYER", StringComparison.OrdinalIgnoreCase) || v.Key.Contains("SLOT", StringComparison.OrdinalIgnoreCase)).ToList();
+            var display = playerVars.Count > 0
+                ? string.Join(", ", playerVars.Select(v => $"{v.Key}={v.Value}"))
+                : "(no PLAYER/SLOT vars found)";
+            Logger.WriteLineWithStep($"Variables for {server.Name}: {display}", Logger.Step.GameMonitoring);
+        }
+
         var maxPlayers = JsonResponseParser.ExtractMaxPlayerCount(json, server.Uuid, gameConfig.MaxPlayerVariable, gameConfig.MaxPlayer);
         // Use display IP for queries (works for both internal and external connectivity)
         var ip = NetworkHelper.GetDisplayIp(server);

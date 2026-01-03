@@ -183,6 +183,36 @@ public static class JsonResponseParser
     }
 
     /// <summary>
+    /// Extracts all variables for a server (env_variable, server_value) for debugging.
+    /// </summary>
+    public static List<KeyValuePair<string, string>> ExtractAllVariables(string json, string uuid)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var result = new List<KeyValuePair<string, string>>();
+
+        foreach (var data in doc.RootElement.GetProperty("data").EnumerateArray())
+        {
+            var serverUuid = data.GetProperty("attributes").GetProperty("uuid").GetString();
+            if (serverUuid != uuid) continue;
+
+            var variables = data.GetProperty("attributes")
+                .GetProperty("relationships")
+                .GetProperty("variables")
+                .GetProperty("data");
+
+            foreach (var variable in variables.EnumerateArray())
+            {
+                var attr = variable.GetProperty("attributes");
+                var name = attr.GetProperty("env_variable").GetString() ?? "";
+                var value = attr.GetProperty("server_value").GetString() ?? "";
+                result.Add(new KeyValuePair<string, string>(name, value));
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Extracts max player count from server variables.
     /// </summary>
     public static int ExtractMaxPlayerCount(string json, string uuid, string? variableName, string? staticValue)
