@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Pelican_Keeper.Core;
 using Pelican_Keeper.Utilities;
 
 namespace Pelican_Keeper.HostMonitor;
@@ -23,6 +24,10 @@ public static class NodeExporterClient
         try
         {
             var response = await Client.GetStringAsync(url);
+            if (RuntimeContext.Config.Debug)
+            {
+                Logger.WriteLineWithStep($"node-exporter raw response:\n{response}", Logger.Step.Helper);
+            }
             ParsePrometheusMetrics(response, metrics);
             metrics.IsValid = true;
         }
@@ -132,23 +137,45 @@ public static class NodeExporterClient
             // Filesystem available: node_filesystem_avail_bytes{mountpoint="..."} value
             if (line.Contains("node_filesystem_avail_bytes{"))
             {
-                var mountMatch = Regex.Match(line, @"mountpoint=""([^""]+)""");
-                var valueMatch = Regex.Match(line, @"node_filesystem_avail_bytes\{[^}]+\}\s+([0-9.eE+-]+)");
+                var mountMatch = Regex.Match(line, "mountpoint=\"([^\\\"]+)\"");
+                var valueMatch = Regex.Match(line, "node_filesystem_avail_bytes\\{[^}]+\\}\\s+([0-9.eE+-]+)");
 
                 if (mountMatch.Success && valueMatch.Success && double.TryParse(valueMatch.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
                 {
                     var mountpoint = mountMatch.Groups[1].Value;
                     if (!diskMounts.ContainsKey(mountpoint))
                     {
-                        // Skip if size was filtered out earlier
-                        continue;
+                        diskMounts[mountpoint] = new DiskMount { MountPoint = mountpoint };
                     }
                     diskMounts[mountpoint].AvailableBytes = (ulong)Math.Max(0, value);
+                }
+            }
+
+            // Filesystem free: node_filesystem_free_bytes{mountpoint="..."} value (fallback if avail missing)
+            if (line.Contains("node_filesystem_free_bytes{"))
+            {
+                var mountMatch = Regex.Match(line, "mountpoint=\"([^\\\"]+)\"");
+                var valueMatch = Regex.Match(line, "node_filesystem_free_bytes\\{[^}]+\\}\\s+([0-9.eE+-]+)");
+
+                if (mountMatch.Success && valueMatch.Success && double.TryParse(valueMatch.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+                {
+                    var mountpoint = mountMatch.Groups[1].Value;
+                    if (!diskMounts.ContainsKey(mountpoint))
+                    {
+                        diskMounts[mountpoint] = new DiskMount { MountPoint = mountpoint };
+                    }
+
+                    // Prefer avail if already set; otherwise use free
+                    if (diskMounts[mountpoint].AvailableBytes == 0)
+                        diskMounts[mountpoint].AvailableBytes = (ulong)Math.Max(0, value);
                 }
             }
         }
 
         // Calculate CPU usage percentage using idle vs total time
+        metrics.CpuIdleSecondsTotal = cpuIdle;
+        metrics.CpuTotalSecondsTotal = cpuTotal;
+
         if (cpuTotal > 0)
         {
             var usage = (cpuTotal - cpuIdle) / cpuTotal * 100;

@@ -41,6 +41,12 @@ public static class HostMetricsService
                     metrics.CpuUsagePercent = Math.Clamp(usage, 0, 100);
                 }
             }
+            else if (metrics.IsValid && metrics.CpuTotalSecondsTotal > 0)
+            {
+                // First sample: use instantaneous percentage from exporter to avoid 0%/stuck values
+                var usage = (metrics.CpuTotalSecondsTotal - metrics.CpuIdleSecondsTotal) / metrics.CpuTotalSecondsTotal * 100;
+                metrics.CpuUsagePercent = Math.Clamp(usage, 0, 100);
+            }
         }
 
         lock (LockObject)
