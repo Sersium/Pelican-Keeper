@@ -27,6 +27,22 @@ public static class HostMetricsService
         var url = RuntimeContext.HostMetricsUrl ?? "http://node-exporter:9100/metrics";
         var metrics = await NodeExporterClient.FetchMetricsAsync(url);
 
+        // Recompute CPU usage using deltas between samples for a realistic percentage
+        lock (LockObject)
+        {
+            var prev = _cachedMetrics;
+            if (metrics.IsValid && prev.CpuTotalSecondsTotal > 0 && metrics.CpuTotalSecondsTotal > prev.CpuTotalSecondsTotal)
+            {
+                var totalDelta = metrics.CpuTotalSecondsTotal - prev.CpuTotalSecondsTotal;
+                var idleDelta = metrics.CpuIdleSecondsTotal - prev.CpuIdleSecondsTotal;
+                if (totalDelta > 0)
+                {
+                    var usage = (1 - (idleDelta / totalDelta)) * 100;
+                    metrics.CpuUsagePercent = Math.Clamp(usage, 0, 100);
+                }
+            }
+        }
+
         lock (LockObject)
         {
             _cachedMetrics = metrics;

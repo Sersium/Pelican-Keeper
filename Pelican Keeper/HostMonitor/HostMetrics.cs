@@ -11,6 +11,16 @@ public class HostMetrics
     public double CpuUsagePercent { get; set; }
 
     /// <summary>
+    /// Cumulative idle seconds from node-exporter.
+    /// </summary>
+    public double CpuIdleSecondsTotal { get; set; }
+
+    /// <summary>
+    /// Cumulative total seconds from node-exporter.
+    /// </summary>
+    public double CpuTotalSecondsTotal { get; set; }
+
+    /// <summary>
     /// Total system memory in bytes.
     /// </summary>
     public ulong MemoryTotalBytes { get; set; }
