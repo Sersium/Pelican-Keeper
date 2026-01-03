@@ -20,6 +20,7 @@
         "Dotnet_8": "ghcr.io/parkervcp/yolks:dotnet_8"
     },
     "file_denylist": [],
+    "network_mode": "host",
     "startup_commands": {
         "Default": "./\"Pelican Keeper\""
     },
