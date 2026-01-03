@@ -60,6 +60,23 @@ public static class NetworkHelper
     }
 
     /// <summary>
+    /// Gets the IP to use for game server queries (internal allocation IP, not display IP).
+    /// The bot runs in Docker and needs to query game servers via internal network IPs.
+    /// </summary>
+    public static string GetQueryIp(ServerInfo serverInfo)
+    {
+        var allocation = GetDefaultAllocation(serverInfo);
+        if (allocation == null)
+        {
+            return "N/A";
+        }
+
+        // Always use the allocation IP for queries (internal Docker network)
+        // Never use external IP as the bot runs in the same network as the game servers
+        return allocation.Ip;
+    }
+
+    /// <summary>
     /// Checks if an IP matches the internal network pattern.
     /// </summary>
     public static bool IsInternalIp(string ip)
