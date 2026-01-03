@@ -33,23 +33,42 @@ public sealed class MinecraftJavaQueryService : IQueryService
     /// <inheritdoc />
     public async Task ConnectAsync()
     {
+        Logger.WriteLineWithStep($"Attempting to connect to {Ip}:{Port}", Logger.Step.MinecraftJavaQuery);
         _client = new TcpClient { ReceiveTimeout = Timeout, SendTimeout = Timeout };
-        await _client.ConnectAsync(Ip, Port);
-        _stream = _client.GetStream();
+        try
+        {
+            await _client.ConnectAsync(Ip, Port);
+            _stream = _client.GetStream();
+            Logger.WriteLineWithStep($"Successfully connected to {Ip}:{Port}", Logger.Step.MinecraftJavaQuery);
+        }
+        catch (Exception ex)
+        {
+            Logger.WriteLineWithStep($"Failed to connect to {Ip}:{Port}: {ex.GetType().Name}: {ex.Message}", Logger.Step.MinecraftJavaQuery);
+            throw;
+        }
     }
 
     /// <inheritdoc />
     public async Task<string> QueryAsync()
     {
-        if (_stream == null) return "N/A";
+        if (_stream == null)
+        {
+            Logger.WriteLineWithStep($"Stream is null for {Ip}:{Port}, skipping query", Logger.Step.MinecraftJavaQuery);
+            return "N/A";
+        }
 
         try
         {
+            Logger.WriteLineWithStep($"Sending SLP handshake to {Ip}:{Port}", Logger.Step.MinecraftJavaQuery);
             await SendHandshakeAsync();
+            Logger.WriteLineWithStep($"Sending status request to {Ip}:{Port}", Logger.Step.MinecraftJavaQuery);
             await SendStatusRequestAsync();
 
+            Logger.WriteLineWithStep($"Reading response from {Ip}:{Port}", Logger.Step.MinecraftJavaQuery);
             var response = await ReadResponseAsync();
-            return ParsePlayerCount(response);
+            var result = ParsePlayerCount(response);
+            Logger.WriteLineWithStep($"Direct SLP query succeeded: {result} for {Ip}:{Port}", Logger.Step.MinecraftJavaQuery);
+            return result;
         }
         catch (Exception ex)
         {
@@ -65,14 +84,19 @@ public sealed class MinecraftJavaQueryService : IQueryService
     {
         try
         {
-            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
             var url = $"https://api.mcstatus.io/v2/status/java/{Ip}:{Port}";
+            Logger.WriteLineWithStep($"Querying mcstatus.io API: {url}", Logger.Step.MinecraftJavaQuery);
+
+            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
             var response = await httpClient.GetStringAsync(url);
+            Logger.WriteLineWithStep($"mcstatus.io API response received: {response.Substring(0, Math.Min(100, response.Length))}...", Logger.Step.MinecraftJavaQuery);
 
             // Parse JSON response to extract player counts from "players" object
             // Example: "players":{"online":71,"max":100}
             var onlineMatch = System.Text.RegularExpressions.Regex.Match(response, "\"players\":\\s*\\{[^}]*\"online\":(\\d+)");
             var maxMatch = System.Text.RegularExpressions.Regex.Match(response, "\"max\":(\\d+)");
+
+            Logger.WriteLineWithStep($"mcstatus.io parsing: onlineMatch.Success={onlineMatch.Success}, maxMatch.Success={maxMatch.Success}", Logger.Step.MinecraftJavaQuery);
 
             if (onlineMatch.Success && maxMatch.Success)
             {
@@ -87,7 +111,7 @@ public sealed class MinecraftJavaQueryService : IQueryService
         }
         catch (Exception ex)
         {
-            Logger.WriteLineWithStep($"mcstatus.io API fallback failed for {Ip}:{Port}: {ex.Message}", Logger.Step.MinecraftJavaQuery);
+            Logger.WriteLineWithStep($"mcstatus.io API fallback failed for {Ip}:{Port}: {ex.GetType().Name}: {ex.Message}", Logger.Step.MinecraftJavaQuery);
             return "N/A";
         }
     }

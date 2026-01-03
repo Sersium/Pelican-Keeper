@@ -258,14 +258,19 @@ public static class ServerMonitorService
         using var service = new MinecraftJavaQueryService(ip, port);
         try
         {
+            Logger.WriteLineWithStep($"Starting connection attempt for {ip}:{port}", Logger.Step.MinecraftJavaQuery);
             service.ConnectAsync().GetAwaiter().GetResult();
+            Logger.WriteLineWithStep($"Connection succeeded, now running query for {ip}:{port}", Logger.Step.MinecraftJavaQuery);
             server.PlayerCountText = service.QueryAsync().GetAwaiter().GetResult();
+            Logger.WriteLineWithStep($"Query completed with result: {server.PlayerCountText} for {ip}:{port}", Logger.Step.MinecraftJavaQuery);
         }
         catch (Exception ex)
         {
             // Connection failed, try API fallback
-            Logger.WriteLineWithStep($"Minecraft direct connection failed: {ex.Message}, trying API fallback", Logger.Step.MinecraftJavaQuery);
+            Logger.WriteLineWithStep($"Minecraft query caught exception for {ip}:{port}: {ex.GetType().Name}: {ex.Message}", Logger.Step.MinecraftJavaQuery);
+            Logger.WriteLineWithStep($"Calling mcstatus.io API fallback for {ip}:{port}", Logger.Step.MinecraftJavaQuery);
             server.PlayerCountText = service.QueryViaMcStatusApiAsync().GetAwaiter().GetResult();
+            Logger.WriteLineWithStep($"Fallback query completed with result: {server.PlayerCountText} for {ip}:{port}", Logger.Step.MinecraftJavaQuery);
         }
     }
 
