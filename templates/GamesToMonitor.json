@@ -1,5 +1,11 @@
 ﻿[
   {
+    "Game": "Minecraft Java (Generic)",
+    "Protocol": "MinecraftJava",
+    "QueryPortVariable": "SERVER_PORT",
+    "_comment": "Fallback for any Minecraft modpack with 'minecraft' tag that isn't explicitly listed"
+  },
+  {
     "Game": "Terraria Vanilla",
     "Protocol": "Terraria",
     "QueryPortVariable": "SERVER_PORT"

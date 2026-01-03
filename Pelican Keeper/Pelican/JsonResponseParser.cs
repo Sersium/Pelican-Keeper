@@ -20,10 +20,20 @@ public static class JsonResponseParser
         foreach (var egg in doc.RootElement.GetProperty("data").EnumerateArray())
         {
             var attr = egg.GetProperty("attributes");
+            var tags = new List<string>();
+            if (attr.TryGetProperty("tags", out var tagsElement) && tagsElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var tag in tagsElement.EnumerateArray())
+                {
+                    if (tag.GetString() is { } tagStr)
+                        tags.Add(tagStr);
+                }
+            }
             eggs.Add(new EggInfo
             {
                 Id = attr.GetProperty("id").GetInt32(),
-                Name = attr.GetProperty("name").GetString() ?? ""
+                Name = attr.GetProperty("name").GetString() ?? "",
+                Tags = tags
             });
         }
 

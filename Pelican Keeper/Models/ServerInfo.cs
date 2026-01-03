@@ -85,4 +85,7 @@ public class EggInfo
 
     /// <summary>Display name of the egg/game.</summary>
     public string Name { get; set; } = null!;
+
+    /// <summary>Tags/categories for the egg (replaces nests in Pelican).</summary>
+    public List<string> Tags { get; set; } = [];
 }

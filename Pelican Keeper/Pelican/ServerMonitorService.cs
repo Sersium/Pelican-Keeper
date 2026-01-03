@@ -43,7 +43,11 @@ public static class ServerMonitorService
         foreach (var server in servers)
         {
             var egg = _eggsList.Find(e => e.Id == server.Egg.Id);
-            if (egg != null) server.Egg.Name = egg.Name;
+            if (egg != null)
+            {
+                server.Egg.Name = egg.Name;
+                server.Egg.Tags = egg.Tags;
+            }
         }
 
         // Apply early filters (UUID-based, before fetching stats)
@@ -123,6 +127,18 @@ public static class ServerMonitorService
         if (_gamesToMonitor == null || _gamesToMonitor.Count == 0) return;
 
         var gameConfig = _gamesToMonitor.FirstOrDefault(g => g.Game == server.Egg.Name);
+
+        // Fallback: if not found by exact name, check tags for known categories
+        if (gameConfig == null)
+        {
+            var tags = server.Egg.Tags.Select(t => t.ToLowerInvariant()).ToList();
+            if (tags.Contains("minecraft") || tags.Any(t => t.Contains("minecraft")))
+            {
+                // Use Minecraft Java Generic fallback config
+                gameConfig = _gamesToMonitor.FirstOrDefault(g => g.Game == "Minecraft Java (Generic)");
+            }
+        }
+
         if (gameConfig == null) return;
 
         var maxPlayers = JsonResponseParser.ExtractMaxPlayerCount(json, server.Uuid, gameConfig.MaxPlayerVariable, gameConfig.MaxPlayer);
