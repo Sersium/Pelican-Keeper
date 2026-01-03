@@ -143,11 +143,18 @@ public class EmbedBuilderService
             embed.AddField("CPU Usage", $"{cpuBar} {metrics.CpuUsagePercent:0.0}%", inline: false);
 
             // Memory
-            var memUsedGb = metrics.MemoryUsedBytes / (1024.0 * 1024.0 * 1024.0);
-            var memTotalGb = metrics.MemoryTotalBytes / (1024.0 * 1024.0 * 1024.0);
-            var memPercent = (double)metrics.MemoryUsedBytes / metrics.MemoryTotalBytes * 100;
-            var memBar = BuildProgressBar(memPercent);
-            embed.AddField("Memory", $"{memBar} {memUsedGb:0.00} GB / {memTotalGb:0.00} GB ({memPercent:0.0}%)", inline: false);
+            if (metrics.MemoryTotalBytes == 0)
+            {
+                embed.AddField("Memory", "⚠️ No memory metrics available", inline: false);
+            }
+            else
+            {
+                var memUsedGb = metrics.MemoryUsedBytes / (1024.0 * 1024.0 * 1024.0);
+                var memTotalGb = metrics.MemoryTotalBytes / (1024.0 * 1024.0 * 1024.0);
+                var memPercent = (double)metrics.MemoryUsedBytes / metrics.MemoryTotalBytes * 100;
+                var memBar = BuildProgressBar(memPercent);
+                embed.AddField("Memory", $"{memBar} {memUsedGb:0.00} GB / {memTotalGb:0.00} GB ({memPercent:0.0}%)", inline: false);
+            }
 
             // Disk mounts
             if (metrics.Mounts.Count > 0)
@@ -188,8 +195,14 @@ public class EmbedBuilderService
 
     private static string BuildProgressBar(double percent, int width = 10)
     {
-        var filled = (int)(percent / 100 * width);
+        if (double.IsNaN(percent) || double.IsInfinity(percent)) percent = 0;
+        percent = Math.Clamp(percent, 0, 100);
+        width = Math.Max(1, width);
+
+        var filled = (int)Math.Round(percent / 100 * width);
+        filled = Math.Clamp(filled, 0, width);
         var empty = width - filled;
+
         var bar = new string('█', filled) + new string('░', empty);
         return $"[{bar}]";
     }
