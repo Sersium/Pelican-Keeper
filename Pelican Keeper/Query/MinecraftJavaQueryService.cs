@@ -54,7 +54,7 @@ public sealed class MinecraftJavaQueryService : IQueryService
         catch (Exception ex)
         {
             // Log query failures for debugging
-            Logger.WriteLineWithStep($"Minecraft query failed for {Ip}:{Port}: {ex.GetType().Name}", Logger.Step.MinecraftJavaQuery);
+            Logger.WriteLineWithStep($"Minecraft query failed for {Ip}:{Port}: {ex.GetType().Name}: {ex.Message}", Logger.Step.MinecraftJavaQuery);
             return "N/A";
         }
     }
