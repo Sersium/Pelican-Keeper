@@ -216,56 +216,54 @@ public static class FileManager
         }
         string? val;
 
-        // Enums
-        if ((val = GetEnv("MessageFormat")) != null && Enum.TryParse(val, true, out MessageFormat mf))
+        // Enums - Pelican uses UPPERCASE, support both PascalCase and UPPERCASE
+        if ((val = GetEnv("MessageFormat") ?? GetEnv("MESSAGEFORMAT")) != null && Enum.TryParse(val, true, out MessageFormat mf))
             config.MessageFormat = mf;
-        if ((val = GetEnv("MessageSorting")) != null && Enum.TryParse(val, true, out MessageSorting ms))
+        if ((val = GetEnv("MessageSorting") ?? GetEnv("MESSAGESORTING")) != null && Enum.TryParse(val, true, out MessageSorting ms))
             config.MessageSorting = ms;
-        if ((val = GetEnv("MessageSortingDirection")) != null && Enum.TryParse(val, true, out MessageSortingDirection msd))
+        if ((val = GetEnv("MessageSortingDirection") ?? GetEnv("MESSAGESORTINGDIRECTION")) != null && Enum.TryParse(val, true, out MessageSortingDirection msd))
             config.MessageSortingDirection = msd;
 
-        // Booleans
-        if ((val = GetEnv("IgnoreOfflineServers")) != null) config.IgnoreOfflineServers = ParseBool(val);
-        if ((val = GetEnv("IgnoreInternalServers")) != null) config.IgnoreInternalServers = ParseBool(val);
-        if ((val = GetEnv("IgnoreServersWithoutAllocations")) != null) config.IgnoreServersWithoutAllocations = ParseBool(val);
-        if ((val = GetEnv("JoinableIpDisplay")) != null) config.JoinableIpDisplay = ParseBool(val);
-        if ((val = GetEnv("PlayerCountDisplay")) != null) config.PlayerCountDisplay = ParseBool(val);
-        if ((val = GetEnv("AutomaticShutdown")) != null) config.AutomaticShutdown = ParseBool(val);
-        if ((val = GetEnv("AllowUserServerStartup")) != null) config.AllowUserServerStartup = ParseBool(val);
-        if ((val = GetEnv("AllowUserServerStopping")) != null) config.AllowUserServerStopping = ParseBool(val);
-        // Support both AutoUpdate and AUTO_UPDATE (Pelican egg convention)
+        // Booleans - Pelican uses UPPERCASE, support both PascalCase and UPPERCASE
+        if ((val = GetEnv("IgnoreOfflineServers") ?? GetEnv("IGNOREOFFLINESERVERS")) != null) config.IgnoreOfflineServers = ParseBool(val);
+        if ((val = GetEnv("IgnoreInternalServers") ?? GetEnv("IGNOREINTERNALSERVERS")) != null) config.IgnoreInternalServers = ParseBool(val);
+        if ((val = GetEnv("IgnoreServersWithoutAllocations") ?? GetEnv("IGNORESERVERSWITHOUTALLOCATIONS")) != null) config.IgnoreServersWithoutAllocations = ParseBool(val);
+        if ((val = GetEnv("JoinableIpDisplay") ?? GetEnv("JOINABLEIPDISPLAY")) != null) config.JoinableIpDisplay = ParseBool(val);
+        if ((val = GetEnv("PlayerCountDisplay") ?? GetEnv("PLAYERCOUNTDISPLAY")) != null) config.PlayerCountDisplay = ParseBool(val);
+        if ((val = GetEnv("AutomaticShutdown") ?? GetEnv("AUTOMATICSHUTDOWN")) != null) config.AutomaticShutdown = ParseBool(val);
+        if ((val = GetEnv("AllowUserServerStartup") ?? GetEnv("ALLOWUSERSERVERSTARTUP")) != null) config.AllowUserServerStartup = ParseBool(val);
+        if ((val = GetEnv("AllowUserServerStopping") ?? GetEnv("ALLOWUSERSERVERSTOPPING")) != null) config.AllowUserServerStopping = ParseBool(val);
         if ((val = GetEnv("AutoUpdate") ?? GetEnv("AUTO_UPDATE")) != null) config.AutoUpdate = ParseBool(val);
-        if ((val = GetEnv("NotifyOnUpdate")) != null) config.NotifyOnUpdate = ParseBool(val);
-        // Support both Debug and DEBUG (Pelican egg convention)
+        if ((val = GetEnv("NotifyOnUpdate") ?? GetEnv("NOTIFYONUPDATE")) != null) config.NotifyOnUpdate = ParseBool(val);
         if ((val = GetEnv("Debug") ?? GetEnv("DEBUG")) != null) config.Debug = ParseBool(val);
-        if ((val = GetEnv("DryRun")) != null) config.DryRun = ParseBool(val);
-        if ((val = GetEnv("LimitServerCount")) != null) config.LimitServerCount = ParseBool(val);
-        if ((val = GetEnv("ContinuesMarkdownRead")) != null) config.ContinuesMarkdownRead = ParseBool(val);
-        if ((val = GetEnv("ContinuesGamesToMonitorRead")) != null) config.ContinuesGamesToMonitorRead = ParseBool(val);
+        if ((val = GetEnv("DryRun") ?? GetEnv("DRYRUN")) != null) config.DryRun = ParseBool(val);
+        if ((val = GetEnv("LimitServerCount") ?? GetEnv("LIMITSERVERCOUNT")) != null) config.LimitServerCount = ParseBool(val);
+        if ((val = GetEnv("ContinuesMarkdownRead") ?? GetEnv("CONTINUESMARKDOWNREAD")) != null) config.ContinuesMarkdownRead = ParseBool(val);
+        if ((val = GetEnv("ContinuesGamesToMonitorRead") ?? GetEnv("CONTINUESGAMESTOMONITORREAD")) != null) config.ContinuesGamesToMonitorRead = ParseBool(val);
 
-        // Strings
-        if ((val = GetEnv("InternalIpStructure")) != null) config.InternalIpStructure = val;
-        if ((val = GetEnv("EmptyServerTimeout")) != null) config.EmptyServerTimeout = val;
+        // Strings - Pelican uses UPPERCASE, support both PascalCase and UPPERCASE
+        if ((val = GetEnv("InternalIpStructure") ?? GetEnv("INTERNALIPSTRUCTURE")) != null) config.InternalIpStructure = val;
+        if ((val = GetEnv("EmptyServerTimeout") ?? GetEnv("EMPTYSERVERTIMEOUT")) != null) config.EmptyServerTimeout = val;
 
-        // String arrays (comma-separated, with whitespace trimming)
+        // String arrays - Pelican uses UPPERCASE, support both PascalCase and UPPERCASE
         static string[] ParseArray(string? v) => string.IsNullOrWhiteSpace(v)
             ? []
             : v.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if ((val = GetEnv("ServersToIgnore")) != null) config.ServersToIgnore = ParseArray(val);
-        if ((val = GetEnv("ServersToMonitor")) != null) config.ServersToMonitor = ParseArray(val);
-        if ((val = GetEnv("ServersToAutoShutdown")) != null) config.ServersToAutoShutdown = ParseArray(val);
-        if ((val = GetEnv("AllowServerStartup")) != null) config.AllowServerStartup = ParseArray(val);
-        if ((val = GetEnv("AllowServerStopping")) != null) config.AllowServerStopping = ParseArray(val);
-        if ((val = GetEnv("UsersAllowedToStartServers")) != null) config.UsersAllowedToStartServers = ParseArray(val);
-        if ((val = GetEnv("UsersAllowedToStopServers")) != null) config.UsersAllowedToStopServers = ParseArray(val);
-        if ((val = GetEnv("ServersToDisplay")) != null) config.ServersToDisplay = ParseArray(val);
+        if ((val = GetEnv("ServersToIgnore") ?? GetEnv("SERVERSTOIGNORE")) != null) config.ServersToIgnore = ParseArray(val);
+        if ((val = GetEnv("ServersToMonitor") ?? GetEnv("SERVERSTOMONITOR")) != null) config.ServersToMonitor = ParseArray(val);
+        if ((val = GetEnv("ServersToAutoShutdown") ?? GetEnv("SERVERSTOAUTOSHUTDOWN")) != null) config.ServersToAutoShutdown = ParseArray(val);
+        if ((val = GetEnv("AllowServerStartup") ?? GetEnv("ALLOWSERVERSTARTUP")) != null) config.AllowServerStartup = ParseArray(val);
+        if ((val = GetEnv("AllowServerStopping") ?? GetEnv("ALLOWSERVERSTOPPING")) != null) config.AllowServerStopping = ParseArray(val);
+        if ((val = GetEnv("UsersAllowedToStartServers") ?? GetEnv("USERSALLOWEDTOSTARTSERVERS")) != null) config.UsersAllowedToStartServers = ParseArray(val);
+        if ((val = GetEnv("UsersAllowedToStopServers") ?? GetEnv("USERSALLOWEDTOSTOPSERVERS")) != null) config.UsersAllowedToStopServers = ParseArray(val);
+        if ((val = GetEnv("ServersToDisplay") ?? GetEnv("SERVERSTODISPLAY")) != null) config.ServersToDisplay = ParseArray(val);
 
-        // Integers
-        if ((val = GetEnv("MarkdownUpdateInterval")) != null && int.TryParse(val, out int mui))
+        // Integers - Pelican uses UPPERCASE, support both PascalCase and UPPERCASE
+        if ((val = GetEnv("MarkdownUpdateInterval") ?? GetEnv("MARKDOWNUPDATEINTERVAL")) != null && int.TryParse(val, out int mui))
             config.MarkdownUpdateInterval = mui;
-        if ((val = GetEnv("ServerUpdateInterval")) != null && int.TryParse(val, out int sui))
+        if ((val = GetEnv("ServerUpdateInterval") ?? GetEnv("SERVERUPDATEINTERVAL")) != null && int.TryParse(val, out int sui))
             config.ServerUpdateInterval = sui;
-        if ((val = GetEnv("MaxServerCount")) != null && int.TryParse(val, out int msc))
+        if ((val = GetEnv("MaxServerCount") ?? GetEnv("MAXSERVERCOUNT")) != null && int.TryParse(val, out int msc))
             config.MaxServerCount = msc;
     }
 
