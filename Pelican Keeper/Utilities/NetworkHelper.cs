@@ -62,6 +62,7 @@ public static class NetworkHelper
     /// <summary>
     /// Gets the IP to use for game server queries (internal allocation IP, not display IP).
     /// The bot runs in Docker and needs to query game servers via internal network IPs.
+    /// Falls back to display IP if allocation IP is invalid (e.g., 0.0.0.0).
     /// </summary>
     public static string GetQueryIp(ServerInfo serverInfo)
     {
@@ -71,8 +72,15 @@ public static class NetworkHelper
             return "N/A";
         }
 
-        // Always use the allocation IP for queries (internal Docker network)
-        // Never use external IP as the bot runs in the same network as the game servers
+        // If allocation IP is 0.0.0.0 (wildcard/default), it's not a valid query target
+        // Fall back to display IP (external IP or internal if available)
+        if (allocation.Ip == "0.0.0.0" || string.IsNullOrEmpty(allocation.Ip))
+        {
+            return GetDisplayIp(serverInfo);
+        }
+
+        // Use the allocation IP for queries (internal Docker network)
+        // Bot runs in Docker and queries game servers via internal network IPs
         return allocation.Ip;
     }
 
