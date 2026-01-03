@@ -167,7 +167,13 @@ public static class ServerMonitorService
         if (ip == "N/A")
         {
             if (RuntimeContext.Config.Debug)
-                Logger.WriteLineWithStep($"No valid IP for server '{server.Name}'", Logger.Step.GameMonitoring);
+            {
+                var allocation = NetworkHelper.GetDefaultAllocation(server);
+                if (allocation?.Ip == "0.0.0.0")
+                    Logger.WriteLineWithStep($"Cannot query player count: server '{server.Name}' has server-ip=0.0.0.0 (binds to all interfaces, not directly queryable from Docker)", Logger.Step.GameMonitoring);
+                else
+                    Logger.WriteLineWithStep($"No valid allocation IP for server '{server.Name}'", Logger.Step.GameMonitoring);
+            }
             return;
         }
 
