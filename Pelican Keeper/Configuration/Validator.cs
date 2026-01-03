@@ -61,6 +61,9 @@ public static class Validator
         if (config.MarkdownUpdateInterval < 10)
             throw new ArgumentException("MarkdownUpdateInterval must be at least 10 seconds.");
 
+        if (config.HostMetricsUpdateInterval < 1)
+            throw new ArgumentException("HostMetricsUpdateInterval must be at least 1 second.");
+
         if (config.ServerUpdateInterval < 10)
             throw new ArgumentException("ServerUpdateInterval must be at least 10 seconds.");
     }

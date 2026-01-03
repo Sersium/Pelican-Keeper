@@ -114,6 +114,7 @@ public static class FileManager
         ContinuesMarkdownRead = false,
         ContinuesGamesToMonitorRead = false,
         MarkdownUpdateInterval = 30,
+        HostMetricsUpdateInterval = 3,
         ServerUpdateInterval = 10,
         LimitServerCount = false,
         MaxServerCount = 10,
@@ -262,6 +263,8 @@ public static class FileManager
         // Integers - Pelican uses UPPERCASE, support both PascalCase and UPPERCASE
         if ((val = GetEnv("MarkdownUpdateInterval") ?? GetEnv("MARKDOWNUPDATEINTERVAL")) != null && int.TryParse(val, out int mui))
             config.MarkdownUpdateInterval = mui;
+        if ((val = GetEnv("HostMetricsUpdateInterval") ?? GetEnv("HOSTMETRICSUPDATEINTERVAL") ?? GetEnv("HOST_METRICS_UPDATE_INTERVAL")) != null && int.TryParse(val, out int hmui))
+            config.HostMetricsUpdateInterval = hmui;
         if ((val = GetEnv("ServerUpdateInterval") ?? GetEnv("SERVERUPDATEINTERVAL")) != null && int.TryParse(val, out int sui))
             config.ServerUpdateInterval = sui;
         if ((val = GetEnv("MaxServerCount") ?? GetEnv("MAXSERVERCOUNT")) != null && int.TryParse(val, out int msc))

@@ -75,6 +75,9 @@ public class Config
     /// <summary>Interval in seconds for reloading markdown template.</summary>
     public int MarkdownUpdateInterval { get; set; }
 
+    /// <summary>Interval in seconds for fetching host metrics updates.</summary>
+    public int HostMetricsUpdateInterval { get; set; }
+
     private int _serverUpdateInterval;
     /// <summary>Interval in seconds between Pelican API polls. Minimum 10.</summary>
     public int ServerUpdateInterval

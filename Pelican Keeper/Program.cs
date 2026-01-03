@@ -406,7 +406,8 @@ public static class Program
         if (RuntimeContext.HostMetricsChannel == null)
             return;
 
-        Logger.WriteLineWithStep("Host metrics updater started (3s interval)", Logger.Step.Initialization);
+        var intervalSeconds = Math.Max(1, RuntimeContext.Config.HostMetricsUpdateInterval);
+        Logger.WriteLineWithStep($"Host metrics updater started ({intervalSeconds}s interval)", Logger.Step.Initialization);
 
         var hostMetricsMessageId = LiveMessageStorage
             .GetExistingHostMetricsMessageAsync(RuntimeContext.HostMetricsChannel)
@@ -446,6 +447,6 @@ public static class Program
             {
                 Logger.WriteLineWithStep($"Host metrics update failed: {ex.Message}", Logger.Step.EmbedBuilding, Logger.OutputType.Error);
             }
-        }, delaySeconds: 3);
+        }, delaySeconds: intervalSeconds);
     }
 }
