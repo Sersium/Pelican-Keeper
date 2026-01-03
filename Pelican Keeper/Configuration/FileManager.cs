@@ -237,7 +237,13 @@ public static class FileManager
         if ((val = GetEnv("AutoUpdate") ?? GetEnv("AUTO_UPDATE")) != null) config.AutoUpdate = ParseBool(val);
         if ((val = GetEnv("NotifyOnUpdate")) != null) config.NotifyOnUpdate = ParseBool(val);
 
-        // Debug - log the raw environment value for troubleshooting
+        // Debug - log ALL environment variables for troubleshooting
+        Console.WriteLine("[Env Check] All environment variables:");
+        foreach (var envVar in Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>().OrderBy(e => e.Key))
+        {
+            Console.WriteLine($"  {envVar.Key}={envVar.Value}");
+        }
+
         var debugEnv = GetEnv("Debug");
         Console.WriteLine($"[Env Check] Debug environment variable: '{debugEnv}' (null: {debugEnv == null}, empty: {string.IsNullOrWhiteSpace(debugEnv)})");
         if (!string.IsNullOrWhiteSpace(debugEnv))
