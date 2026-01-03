@@ -47,8 +47,12 @@ curl -L https://github.com/Sersium/Pelican-Keeper/releases/latest/download/Pelic
 unzip pelican-keeper.zip
 cd Pelican-Keeper-linux-x64
 
-# Create Secrets.json (see Configuration below)
-nano Secrets.json
+# Set environment variables (or export them)
+export BOT_TOKEN="your_discord_bot_token"
+export SERVER_URL="https://panel.example.com"
+export CLIENT_TOKEN="ptlc_your_client_key"
+export SERVER_TOKEN="ptla_your_app_key"
+export CHANNEL_IDS="1234567890123456789"
 
 # Run
 ./"Pelican Keeper"
@@ -56,35 +60,51 @@ nano Secrets.json
 
 ## Configuration
 
-### Secrets.json
+Configuration is done entirely via **environment variables** (no JSON files needed when running in containers).
 
-```json
-{
-  "BotToken": "YOUR_DISCORD_BOT_TOKEN",
-  "ServerUrl": "https://panel.example.com",
-  "ClientToken": "ptlc_YOUR_CLIENT_API_KEY",
-  "ServerToken": "ptla_YOUR_APPLICATION_API_KEY",
-  "TargetChannels": [
-    {
-      "ChannelId": "1234567890123456789",
-      "MessageId": null
-    }
-  ],
-  "NotificationChannelId": null
-}
-```
+### Required Environment Variables
 
-### Config.json
+- `BOT_TOKEN` - Discord bot token
+- `SERVER_URL` - Pelican Panel URL (e.g., `https://panel.example.com`)
+- `CLIENT_TOKEN` - Pelican client API key (`ptlc_...`)
+- `SERVER_TOKEN` - Pelican application API key (`ptla_...`)
+- `CHANNEL_IDS` - Discord channel ID (comma-separated for multiple channels)
 
-Key settings:
+### Optional Environment Variables
 
-- `MessageFormat`: `Consolidated` | `PerServer` | `Paginated`
-- `PlayerCountDisplay`: `true` enables game server queries
-- `AutomaticShutdown`: `true` stops empty servers after timeout
-- `AutoUpdate`: `true` enables automatic updates
-- `Debug`: `true` enables verbose logging
+**Display Settings:**
 
-See [templates/](templates/) for example configurations.
+- `MESSAGEFORMAT` - Display mode: `Consolidated`, `PerServer`, `Paginated` (default: `Consolidated`)
+- `MESSAGESORTING` - Sort order: `Name`, `Players`, `Uptime` (default: `Name`)
+- `MESSAGESORTINGDIRECTION` - Sort direction: `Ascending`, `Descending` (default: `Ascending`)
+- `PLAYERCOUNTDISPLAY` - Enable game queries: `1`/`true` or `0`/`false`/`` (default: `true`)
+
+**Filtering:**
+
+- `IGNOREOFFLINESERVERS` - Hide offline servers: `1`/`0` (default: `false`)
+- `IGNOREINTERNALSERVERS` - Hide internal IP servers: `1`/`0` (default: `false`)
+- `SERVERSTOIGNORE` - Comma-separated server IDs to hide
+- `SERVERSTOMONITOR` - If set, only show these server IDs (comma-separated)
+
+**Auto-Shutdown:**
+
+- `AUTOMATICSHUTDOWN` - Enable auto-shutdown: `1`/`0` (default: `false`)
+- `SERVERSTOAUTOSHUTDOWN` - Server IDs to auto-shutdown (comma-separated)
+- `EMPTYSERVERTIMEOUT` - Timeout before shutdown (default: `00:01:00`)
+
+**Updates:**
+
+- `AUTO_UPDATE` - Enable self-updating: `1`/`0` (default: `false`)
+- `NOTIFYONUPDATE` - Notify on updates: `1`/`0` (default: `true`)
+- `REPO_OWNER` - GitHub username for fork updates (default: `Sersium`)
+- `REPO_NAME` - Repository name (default: `Pelican-Keeper`)
+
+**Other:**
+
+- `DEBUG` - Verbose logging: `1`/`0` (default: `false`)
+- `NOTIFICATION_CHANNEL_ID` - Optional notification channel ID
+
+**Note:** Pelican Panel toggle values use `1` for ON, empty string for OFF.
 
 ## Game Server Queries
 
