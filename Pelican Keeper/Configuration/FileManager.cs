@@ -236,26 +236,8 @@ public static class FileManager
         // Support both AutoUpdate and AUTO_UPDATE (Pelican egg convention)
         if ((val = GetEnv("AutoUpdate") ?? GetEnv("AUTO_UPDATE")) != null) config.AutoUpdate = ParseBool(val);
         if ((val = GetEnv("NotifyOnUpdate")) != null) config.NotifyOnUpdate = ParseBool(val);
-
-        // Debug - log ALL environment variables for troubleshooting
-        Console.WriteLine("[Env Check] All environment variables:");
-        foreach (var envVar in Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>().OrderBy(e => e.Key))
-        {
-            Console.WriteLine($"  {envVar.Key}={envVar.Value}");
-        }
-
-        var debugEnv = GetEnv("Debug");
-        Console.WriteLine($"[Env Check] Debug environment variable: '{debugEnv}' (null: {debugEnv == null}, empty: {string.IsNullOrWhiteSpace(debugEnv)})");
-        if (!string.IsNullOrWhiteSpace(debugEnv))
-        {
-            config.Debug = ParseBool(debugEnv);
-            Console.WriteLine($"[Env Check] Parsed Debug value: {config.Debug}");
-        }
-        else
-        {
-            Console.WriteLine($"[Env Check] Debug not set or empty, using default: {config.Debug}");
-        }
-
+        // Support both Debug and DEBUG (Pelican egg convention)
+        if ((val = GetEnv("Debug") ?? GetEnv("DEBUG")) != null) config.Debug = ParseBool(val);
         if ((val = GetEnv("DryRun")) != null) config.DryRun = ParseBool(val);
         if ((val = GetEnv("LimitServerCount")) != null) config.LimitServerCount = ParseBool(val);
         if ((val = GetEnv("ContinuesMarkdownRead")) != null) config.ContinuesMarkdownRead = ParseBool(val);
