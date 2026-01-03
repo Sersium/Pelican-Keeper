@@ -49,4 +49,15 @@ public class LiveMessageStorageTests
         var pageIndex = LiveMessageStorage.GetPaginated(_testMessageId);
         Assert.That(pageIndex, Is.EqualTo(5));
     }
+
+    [Test]
+    public void SaveHostMetrics_StoresId()
+    {
+        LiveMessageStorage.SaveHostMetrics(_testMessageId);
+
+        var path = Path.Combine(TestContext.CurrentContext.TestDirectory, "MessageHistory.json");
+        var storage = LiveMessageStorage.LoadAll(path);
+
+        Assert.That(storage?.HostMetricsMessageId, Is.EqualTo(_testMessageId));
+    }
 }

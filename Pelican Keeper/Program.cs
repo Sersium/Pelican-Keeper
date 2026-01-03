@@ -408,7 +408,10 @@ public static class Program
 
         Logger.WriteLineWithStep("Host metrics updater started (3s interval)", Logger.Step.Initialization);
 
-        ulong? hostMetricsMessageId = null;
+        var hostMetricsMessageId = LiveMessageStorage
+            .GetExistingHostMetricsMessageAsync(RuntimeContext.HostMetricsChannel)
+            .GetAwaiter()
+            .GetResult();
 
         StartUpdaterLoop(async () =>
         {
@@ -429,12 +432,14 @@ public static class Program
                         // Message deleted, create new one
                         var newMsg = await RuntimeContext.HostMetricsChannel.SendMessageAsync(embed);
                         hostMetricsMessageId = newMsg.Id;
+                        LiveMessageStorage.SaveHostMetrics(newMsg.Id);
                     }
                 }
                 else
                 {
                     var newMsg = await RuntimeContext.HostMetricsChannel.SendMessageAsync(embed);
                     hostMetricsMessageId = newMsg.Id;
+                    LiveMessageStorage.SaveHostMetrics(newMsg.Id);
                 }
             }
             catch (Exception ex)

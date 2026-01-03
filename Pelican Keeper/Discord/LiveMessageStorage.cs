@@ -64,7 +64,8 @@ public static class LiveMessageStorage
             var json = File.ReadAllText(path);
             _historyFilePath = path;
             Logger.WriteLineWithStep($"Loaded MessageHistory.json from: {path}", Logger.Step.MessageHistory);
-            return JsonSerializer.Deserialize<LiveMessageJsonStorage>(json) ?? new LiveMessageJsonStorage();
+            Cache = JsonSerializer.Deserialize<LiveMessageJsonStorage>(json) ?? new LiveMessageJsonStorage();
+            return Cache;
         }
         catch (Exception ex)
         {
@@ -106,6 +107,18 @@ public static class LiveMessageStorage
     }
 
     /// <summary>
+    /// Saves the host metrics message ID to the cache.
+    /// </summary>
+    public static void SaveHostMetrics(ulong messageId)
+    {
+        if (Cache == null) return;
+        if (Cache.HostMetricsMessageId == messageId) return;
+
+        Cache.HostMetricsMessageId = messageId;
+        PersistCache();
+    }
+
+    /// <summary>
     /// Removes a message ID from the cache.
     /// </summary>
     public static void Remove(ulong? messageId)
@@ -125,6 +138,17 @@ public static class LiveMessageStorage
     {
         if (Cache?.LiveStore == null || messageId == null) return null;
         return Cache.LiveStore.Contains((ulong)messageId) ? messageId : null;
+    }
+
+    /// <summary>
+    /// Gets the host metrics message ID if it exists and is still accessible in the provided channel.
+    /// </summary>
+    public static async Task<ulong?> GetExistingHostMetricsMessageAsync(DiscordChannel? channel)
+    {
+        if (Cache?.HostMetricsMessageId == null || channel == null) return null;
+
+        var exists = await MessageExistsAsync([channel], Cache.HostMetricsMessageId.Value);
+        return exists ? Cache.HostMetricsMessageId : null;
     }
 
     /// <summary>
@@ -194,6 +218,13 @@ public static class LiveMessageStorage
                 .WhereAwait(async kvp => await MessageExistsAsync(channels, kvp.Key))
                 .ToDictionaryAsync(kvp => kvp.Key, kvp => kvp.Value);
             Cache.PaginatedLiveStore = filtered;
+        }
+
+        if (RuntimeContext.HostMetricsChannel != null && Cache?.HostMetricsMessageId != null)
+        {
+            var exists = await MessageExistsAsync([RuntimeContext.HostMetricsChannel], Cache.HostMetricsMessageId.Value);
+            if (!exists)
+                Cache.HostMetricsMessageId = null;
         }
 
         PersistCache();

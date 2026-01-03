@@ -10,4 +10,7 @@ public class LiveMessageJsonStorage
 
     /// <summary>Message ID to page index mapping for paginated displays.</summary>
     public Dictionary<ulong, int>? PaginatedLiveStore { get; set; } = [];
+
+    /// <summary>Message ID for the host metrics embed.</summary>
+    public ulong? HostMetricsMessageId { get; set; }
 }
