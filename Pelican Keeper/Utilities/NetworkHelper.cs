@@ -82,9 +82,9 @@ public static class NetworkHelper
         // From bot container, query the Docker host's gateway IP to reach these published ports
         if (allocation.Ip == "0.0.0.0")
         {
-            // Try host.docker.internal first (Docker Desktop / newer Docker versions)
-            // Otherwise use common Docker bridge gateway: 172.17.0.1
-            return "host.docker.internal";
+            // On Linux, use the Docker bridge gateway IP (default: 172.17.0.1)
+            // This is the host's IP as seen from containers on the default bridge network
+            return "172.17.0.1";
         }
 
         // Use the allocation IP for queries (internal Docker network)
