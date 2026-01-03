@@ -154,6 +154,8 @@ public sealed class MinecraftJavaQueryService : IQueryService
 
     private static string ParsePlayerCount(string json)
     {
+        Logger.WriteLineWithStep($"Parsing SLP response (first 200 chars): {json.Substring(0, Math.Min(200, json.Length))}", Logger.Step.MinecraftJavaQuery);
+
         var playersMatch = System.Text.RegularExpressions.Regex.Match(json, @"""players"":\{[^}]*""online"":(\d+)[^}]*""max"":(\d+)");
         if (!playersMatch.Success)
         {
@@ -162,10 +164,13 @@ public sealed class MinecraftJavaQueryService : IQueryService
 
         if (playersMatch.Success)
         {
-            return $"{playersMatch.Groups[1].Value}/{playersMatch.Groups[2].Value}";
+            var result = $"{playersMatch.Groups[1].Value}/{playersMatch.Groups[2].Value}";
+            Logger.WriteLineWithStep($"SLP parsing successful: {result}", Logger.Step.MinecraftJavaQuery);
+            return result;
         }
 
-        return "N/A";
+        Logger.WriteLineWithStep("SLP response does not contain player count data - throwing exception to trigger API fallback", Logger.Step.MinecraftJavaQuery);
+        throw new InvalidDataException("SLP response does not contain player count information");
     }
 
     private static void WriteVarInt(Stream stream, int value)
