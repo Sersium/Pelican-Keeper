@@ -154,28 +154,28 @@ public sealed class MinecraftJavaQueryService : IQueryService
 
     private static string ParsePlayerCount(string json)
     {
-        Logger.WriteLineWithStep($"Parsing SLP response (length: {json.Length} chars)", Logger.Step.MinecraftJavaQuery);
-        Logger.WriteLineWithStep($"Full SLP JSON: {json}", Logger.Step.MinecraftJavaQuery);
-
-        // Check if "players" field exists in the JSON
-        var containsPlayers = json.Contains("\"players\"");
-        Logger.WriteLineWithStep($"JSON contains 'players' field: {containsPlayers}", Logger.Step.MinecraftJavaQuery);
-
+        // Try pattern 1: "players":{..."online":X..."max":Y}
         var playersMatch = System.Text.RegularExpressions.Regex.Match(json, @"""players"":\{[^}]*""online"":(\d+)[^}]*""max"":(\d+)");
-        if (!playersMatch.Success)
-        {
-            Logger.WriteLineWithStep("First regex pattern failed, trying alternate pattern", Logger.Step.MinecraftJavaQuery);
-            playersMatch = System.Text.RegularExpressions.Regex.Match(json, @"""online"":(\d+).*?""max"":(\d+)");
-        }
-
         if (playersMatch.Success)
         {
-            var result = $"{playersMatch.Groups[1].Value}/{playersMatch.Groups[2].Value}";
-            Logger.WriteLineWithStep($"SLP parsing successful: {result}", Logger.Step.MinecraftJavaQuery);
-            return result;
+            return $"{playersMatch.Groups[1].Value}/{playersMatch.Groups[2].Value}";
         }
 
-        Logger.WriteLineWithStep("SLP response does not contain player count data - throwing exception to trigger API fallback", Logger.Step.MinecraftJavaQuery);
+        // Try pattern 2: "players":{..."max":Y..."online":X} (reversed order)
+        playersMatch = System.Text.RegularExpressions.Regex.Match(json, @"""players"":\{[^}]*""max"":(\d+)[^}]*""online"":(\d+)");
+        if (playersMatch.Success)
+        {
+            return $"{playersMatch.Groups[2].Value}/{playersMatch.Groups[1].Value}"; // Swap order to online/max
+        }
+
+        // Try pattern 3: anywhere in JSON, "online":X..."max":Y
+        playersMatch = System.Text.RegularExpressions.Regex.Match(json, @"""online"":(\d+).*?""max"":(\d+)");
+        if (playersMatch.Success)
+        {
+            return $"{playersMatch.Groups[1].Value}/{playersMatch.Groups[2].Value}";
+        }
+
+        // No valid player data found - trigger API fallback
         throw new InvalidDataException("SLP response does not contain player count information");
     }
 
