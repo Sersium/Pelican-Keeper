@@ -266,6 +266,14 @@ public static class LiveMessageStorage
                 return id;
         }
 
+        // Fallback: scan channel for an existing bot-authored message and reuse it
+        var scanned = await FindExistingMessageIdInChannelAsync(channel);
+        if (scanned.HasValue)
+        {
+            Save(scanned.Value);
+            return scanned.Value;
+        }
+
         return null;
     }
 
@@ -282,6 +290,36 @@ public static class LiveMessageStorage
                 return (kvp.Key, kvp.Value);
         }
 
+        // Fallback: scan channel for an existing bot-authored message and reuse it.
+        var scanned = await FindExistingMessageIdInChannelAsync(channel);
+        if (scanned.HasValue)
+        {
+            Save(scanned.Value, 0);
+            return (scanned.Value, 0);
+        }
+
         return (null, null);
+    }
+
+    /// <summary>
+    /// Scans a channel for a recent message authored by a bot and returns its ID.
+    /// Prefer messages that contain embeds, which matches our typical output.
+    /// </summary>
+    public static async Task<ulong?> FindExistingMessageIdInChannelAsync(DiscordChannel channel)
+    {
+        try
+        {
+            var messages = await channel.GetMessagesAsync(100);
+            var candidate = messages
+                .FirstOrDefault(m => m.Author != null && m.Author.IsBot && (m.Embeds?.Count ?? 0) > 0);
+
+            return candidate?.Id;
+        }
+        catch (Exception ex)
+        {
+            if (RuntimeContext.Config.Debug)
+                Logger.WriteLineWithStep($"Failed scanning #{channel.Name} for existing messages: {ex.Message}", Logger.Step.MessageHistory, Logger.OutputType.Warning);
+            return null;
+        }
     }
 }

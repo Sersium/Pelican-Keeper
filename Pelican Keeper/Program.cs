@@ -221,7 +221,23 @@ public static class Program
             }
             catch
             {
-                await CreateNewConsolidatedMessage(channel, embed, components);
+                // Retry by scanning the channel for an existing bot message before creating new
+                var scanned = await LiveMessageStorage.FindExistingMessageIdInChannelAsync(channel);
+                if (scanned.HasValue)
+                {
+                    var msg = await channel.GetMessageAsync(scanned.Value);
+                    await msg.ModifyAsync(mb =>
+                    {
+                        mb.WithEmbed(embed);
+                        mb.ClearComponents();
+                        mb.AddComponentRows(components);
+                    });
+                    await LiveMessageStorage.SaveAsync(scanned.Value);
+                }
+                else
+                {
+                    await CreateNewConsolidatedMessage(channel, embed, components);
+                }
             }
         }
         else
@@ -284,7 +300,26 @@ public static class Program
             }
             catch
             {
-                await CreateNewPaginatedMessage(channel, embeds, servers);
+                // Retry by scanning the channel for an existing bot message before creating new
+                var scanned = await LiveMessageStorage.FindExistingMessageIdInChannelAsync(channel);
+                if (scanned.HasValue)
+                {
+                    var safeIndex = Math.Min(pageIndex.Value, embeds.Count - 1);
+                    var msg = await channel.GetMessageAsync(scanned.Value);
+                    var currentUuid = servers.Count > safeIndex ? servers[safeIndex].Uuid : null;
+                    await msg.ModifyAsync(mb =>
+                    {
+                        mb.WithEmbed(embeds[safeIndex]);
+                        mb.ClearComponents();
+                        var buttons = ComponentBuilders.BuildPaginationButtons(currentUuid, RuntimeContext.Config);
+                        mb.AddComponents(buttons);
+                    });
+                    await LiveMessageStorage.SaveAsync(scanned.Value, safeIndex);
+                }
+                else
+                {
+                    await CreateNewPaginatedMessage(channel, embeds, servers);
+                }
             }
         }
         else
@@ -354,7 +389,23 @@ public static class Program
             }
             catch
             {
-                await CreateNewServerMessage(channel, embed, buttons);
+                // Retry by scanning the channel for an existing bot message before creating new
+                var scanned = await LiveMessageStorage.FindExistingMessageIdInChannelAsync(channel);
+                if (scanned.HasValue)
+                {
+                    var msg = await channel.GetMessageAsync(scanned.Value);
+                    await msg.ModifyAsync(mb =>
+                    {
+                        mb.WithEmbed(embed);
+                        mb.ClearComponents();
+                        if (buttons.Count > 0) mb.AddComponents(buttons);
+                    });
+                    await LiveMessageStorage.SaveAsync(scanned.Value);
+                }
+                else
+                {
+                    await CreateNewServerMessage(channel, embed, buttons);
+                }
             }
         }
         else
@@ -430,10 +481,22 @@ public static class Program
                     }
                     catch
                     {
-                        // Message deleted, create new one
-                        var newMsg = await RuntimeContext.HostMetricsChannel.SendMessageAsync(embed);
-                        hostMetricsMessageId = newMsg.Id;
-                        LiveMessageStorage.SaveHostMetrics(newMsg.Id);
+                        // Retry by scanning the channel for an existing bot message before creating new
+                        var scanned = await LiveMessageStorage.FindExistingMessageIdInChannelAsync(RuntimeContext.HostMetricsChannel);
+                        if (scanned.HasValue)
+                        {
+                            var msg = await RuntimeContext.HostMetricsChannel.GetMessageAsync(scanned.Value);
+                            await msg.ModifyAsync(m => m.Embed = embed);
+                            hostMetricsMessageId = scanned.Value;
+                            LiveMessageStorage.SaveHostMetrics(scanned.Value);
+                        }
+                        else
+                        {
+                            // Message deleted, create new one
+                            var newMsg = await RuntimeContext.HostMetricsChannel.SendMessageAsync(embed);
+                            hostMetricsMessageId = newMsg.Id;
+                            LiveMessageStorage.SaveHostMetrics(newMsg.Id);
+                        }
                     }
                 }
                 else
