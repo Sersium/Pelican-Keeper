@@ -2,7 +2,13 @@
 
 [![CI/CD](https://github.com/Sersium/Pelican-Keeper/actions/workflows/dotnet.yml/badge.svg?branch=main)](https://github.com/Sersium/Pelican-Keeper/actions/workflows/dotnet.yml)
 [![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
+[![Docker Ready](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#docker-compose-install)
+[![Pelican Egg](https://img.shields.io/badge/Pelican-egg-22c55e)](egg-pelican-keeper.json)
+[![Prometheus Metrics](https://img.shields.io/badge/Prometheus-node--exporter-E6522C?logo=prometheus&logoColor=white)](#docker-compose-install)
 [![Latest Release](https://img.shields.io/github/v/release/Sersium/Pelican-Keeper)](https://github.com/Sersium/Pelican-Keeper/releases/latest)
+[![Release Downloads](https://img.shields.io/github/downloads/Sersium/Pelican-Keeper/total)](https://github.com/Sersium/Pelican-Keeper/releases)
+[![Last Commit](https://img.shields.io/github/last-commit/Sersium/Pelican-Keeper)](https://github.com/Sersium/Pelican-Keeper/commits/main)
+[![Repo Size](https://img.shields.io/github/repo-size/Sersium/Pelican-Keeper)](https://github.com/Sersium/Pelican-Keeper)
 [![License](https://img.shields.io/github/license/Sersium/Pelican-Keeper)](LICENSE)
 
 Discord status bot for Pelican Panel servers.
@@ -119,11 +125,19 @@ The bot also tries sane fallbacks, including the Pelican server UUID as an inter
 
 ## Development
 
+Use these commands when changing the bot code locally.
+
 ```bash
 dotnet restore
 dotnet test --configuration Release
 ./build.sh linux
 ```
+
+- `dotnet restore` downloads the NuGet packages the project needs.
+- `dotnet test --configuration Release` builds the app and test project in Release mode, then runs the automated tests.
+- `./build.sh linux` creates a Linux x64 self-contained build in `dist/`, similar to what the release workflow publishes.
+
+You need the .NET 10 SDK installed. For README-only edits, you do not need to run the build commands.
 
 ## Credits
 
