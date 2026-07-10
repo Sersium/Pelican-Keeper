@@ -1,5 +1,10 @@
 # Pelican Keeper
 
+[![CI/CD](https://github.com/Sersium/Pelican-Keeper/actions/workflows/dotnet.yml/badge.svg?branch=main)](https://github.com/Sersium/Pelican-Keeper/actions/workflows/dotnet.yml)
+[![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
+[![Latest Release](https://img.shields.io/github/v/release/Sersium/Pelican-Keeper)](https://github.com/Sersium/Pelican-Keeper/releases/latest)
+[![License](https://img.shields.io/github/license/Sersium/Pelican-Keeper)](LICENSE)
+
 Discord status bot for Pelican Panel servers.
 
 This fork is tuned for Docker/Pelican installs, reliable message updates, host resource monitoring, and player counts across Minecraft, Source/A2S, RCON, and Bedrock servers.
