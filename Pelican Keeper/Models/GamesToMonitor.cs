@@ -14,6 +14,12 @@ public class GamesToMonitor
     /// <summary>Environment variable name for RCON port.</summary>
     public string? RconPortVariable { get; set; }
 
+    /// <summary>Static RCON host/IP (alternative to the display/query IP).</summary>
+    public string? RconHost { get; set; }
+
+    /// <summary>Environment variable name for RCON host/IP.</summary>
+    public string? RconHostVariable { get; set; }
+
     /// <summary>Environment variable name for RCON password.</summary>
     public string? RconPasswordVariable { get; set; }
 

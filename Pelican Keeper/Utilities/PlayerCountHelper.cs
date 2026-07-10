@@ -31,6 +31,12 @@ public static class PlayerCountHelper
             return count;
         }
 
+        // Raw numeric response, typically from an extraction regex.
+        if (Regex.IsMatch(response.Trim(), @"^\d+$") && int.TryParse(response.Trim(), out var rawCount))
+        {
+            return rawCount;
+        }
+
         // Ark RCON format: numbered player list
         var arkPlayers = Regex.Matches(response, @"(\d+)\.\s*([^,]+),\s*(.+)$", RegexOptions.Multiline);
         if (arkPlayers.Count > 0)
@@ -73,6 +79,12 @@ public static class PlayerCountHelper
     /// </summary>
     public static string FormatPlayerCount(string? response, int maxPlayers = 0)
     {
+        if (string.Equals(response, "N/A", StringComparison.OrdinalIgnoreCase) && maxPlayers > 0)
+            return $"N/A/{maxPlayers}";
+
+        if (string.Equals(response, "N/A", StringComparison.OrdinalIgnoreCase))
+            return "N/A";
+
         if (string.IsNullOrEmpty(response) && maxPlayers > 0)
             return $"N/A/{maxPlayers}";
 
@@ -80,6 +92,6 @@ public static class PlayerCountHelper
             return "N/A";
 
         var maxDisplay = maxPlayers > 0 ? maxPlayers.ToString() : "Unknown";
-        return $"{response}/{maxDisplay}";
+        return $"{ExtractPlayerCount(response)}/{maxDisplay}";
     }
 }

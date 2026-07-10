@@ -37,6 +37,29 @@ public class PlayerCountResponseTesting
         Assert.That(formatted, Is.EqualTo("5/20"), "Should format player count correctly.");
     }
 
+    [Test]
+    public void TestPalworldPlayerCountFormatting()
+    {
+        const string response = "name,playeruid,steamid\nPlayerOne,123,76561198000000001\nPlayerTwo,456,76561198000000002";
+
+        var formatted = PlayerCountHelper.FormatPlayerCount(response, 32);
+        Assert.That(formatted, Is.EqualTo("2/32"), "Should count Palworld CSV player rows.");
+    }
+
+    [Test]
+    public void TestEmptyPalworldPlayerCountFormatting()
+    {
+        var formatted = PlayerCountHelper.FormatPlayerCount("name,playeruid,steamid", 32);
+        Assert.That(formatted, Is.EqualTo("0/32"), "Should treat an empty Palworld CSV as zero players.");
+    }
+
+    [Test]
+    public void TestUnavailablePlayerCountFormattingWithMaxPlayers()
+    {
+        var formatted = PlayerCountHelper.FormatPlayerCount("N/A", 32);
+        Assert.That(formatted, Is.EqualTo("N/A/32"), "Should keep unavailable query results distinct from zero players.");
+    }
+
     /// <summary>
     /// Tests player count extraction with null response.
     /// </summary>

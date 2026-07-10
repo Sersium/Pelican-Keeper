@@ -212,15 +212,59 @@ public static class ServerMonitorService
 
         if (port == 0 || string.IsNullOrWhiteSpace(password) || config.Command == null) return;
 
-        var existing = RconConnections.FirstOrDefault(r => r.Ip == ip && r.Port == port);
-        var rcon = existing ?? new RconQueryService(ip, port, password);
+        foreach (var host in GetRconCandidateHosts(server, json, config, ip))
+        {
+            var response = QueryRconHost(host, port, password, config.Command, config.PlayerCountExtractRegex);
+            if (response == "N/A")
+            {
+                if (RuntimeContext.Config.Debug)
+                    Logger.WriteLineWithStep($"RCON query failed for {server.Name} via {host}:{port}", Logger.Step.RconQuery);
+                continue;
+            }
+
+            server.PlayerCountText = PlayerCountHelper.FormatPlayerCount(response, maxPlayers);
+            return;
+        }
+
+        server.PlayerCountText = PlayerCountHelper.FormatPlayerCount("N/A", maxPlayers);
+    }
+
+    private static IEnumerable<string> GetRconCandidateHosts(ServerInfo server, string json, GamesToMonitor config, string queryIp)
+    {
+        var hosts = new List<string?>
+        {
+            config.RconHost,
+            JsonResponseParser.ExtractServerVariableValue(json, server.Uuid, config.RconHostVariable),
+            server.Uuid,
+            queryIp
+        };
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var host in hosts)
+        {
+            if (string.IsNullOrWhiteSpace(host) || host == "N/A") continue;
+            if (seen.Add(host)) yield return host;
+        }
+    }
+
+    private static string QueryRconHost(string host, int port, string password, string command, string? extractRegex)
+    {
+        var existing = RconConnections.FirstOrDefault(r => r.Ip == host && r.Port == port);
+        var rcon = existing ?? new RconQueryService(host, port, password);
 
         rcon.ConnectAsync().GetAwaiter().GetResult();
-        var response = rcon.QueryAsync(config.Command, config.PlayerCountExtractRegex).GetAwaiter().GetResult();
+        var response = rcon.QueryAsync(command, extractRegex).GetAwaiter().GetResult();
 
-        if (!RconConnections.Contains(rcon)) RconConnections.Add(rcon);
+        if (response != "N/A")
+        {
+            if (!RconConnections.Contains(rcon)) RconConnections.Add(rcon);
+        }
+        else if (existing == null)
+        {
+            rcon.Dispose();
+        }
 
-        server.PlayerCountText = PlayerCountHelper.FormatPlayerCount(response, maxPlayers);
+        return response;
     }
 
     private static void QueryMinecraftJavaServer(ServerInfo server, string json, GamesToMonitor config, string ip)

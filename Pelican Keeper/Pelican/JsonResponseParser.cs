@@ -183,6 +183,16 @@ public static class JsonResponseParser
     }
 
     /// <summary>
+    /// Extracts a string server variable value.
+    /// </summary>
+    public static string ExtractServerVariableValue(string json, string uuid, string? variableName)
+    {
+        if (string.IsNullOrWhiteSpace(variableName)) return "";
+
+        return ExtractServerVariable<string>(json, uuid, variableName) ?? "";
+    }
+
+    /// <summary>
     /// Extracts all variables for a server (env_variable, server_value) for debugging.
     /// </summary>
     public static List<KeyValuePair<string, string>> ExtractAllVariables(string json, string uuid)

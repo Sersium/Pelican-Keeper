@@ -25,6 +25,7 @@ public sealed class RconQueryService : IQueryService
     private const int AuthPacket = 3;
     private const int AuthResponse = 2;
     private const int ExecCommand = 2;
+    private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(3);
 
     /// <summary>
     /// Initializes a new RCON query service.
@@ -45,7 +46,13 @@ public sealed class RconQueryService : IQueryService
 
         try
         {
-            await _client.ConnectAsync(Ip, Port);
+            var connectTask = _client.ConnectAsync(Ip, Port);
+            var timeoutTask = Task.Delay(ConnectTimeout);
+
+            if (await Task.WhenAny(connectTask, timeoutTask) != connectTask)
+                throw new TimeoutException($"RCON connection timed out for {Ip}:{Port}");
+
+            await connectTask;
             _stream = _client.GetStream();
             _isAuthenticated = await AuthenticateAsync();
         }
