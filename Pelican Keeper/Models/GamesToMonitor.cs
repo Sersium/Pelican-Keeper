@@ -32,6 +32,12 @@ public class GamesToMonitor
     /// <summary>Environment variable name for query port.</summary>
     public string? QueryPortVariable { get; set; }
 
+    /// <summary>Static query host/IP (alternative to the display/query IP).</summary>
+    public string? QueryHost { get; set; }
+
+    /// <summary>Environment variable name for query host/IP.</summary>
+    public string? QueryHostVariable { get; set; }
+
     /// <summary>Environment variable name for max players.</summary>
     public string? MaxPlayerVariable { get; set; }
 

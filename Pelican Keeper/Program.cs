@@ -18,6 +18,7 @@ public static class Program
 {
     private static readonly EmbedBuilderService EmbedService = new();
     private static DiscordClient? _discordClient;
+    private static int _updatersStarted;
 
     /// <summary>
     /// Main application entry point.
@@ -106,6 +107,10 @@ public static class Program
             return;
         }
 
+        var targetChannels = new List<DiscordChannel>();
+        RuntimeContext.NotificationChannel = null;
+        RuntimeContext.HostMetricsChannel = null;
+
         foreach (var channelId in RuntimeContext.Secrets.ChannelIds)
         {
             var channel = await sender.GetChannelAsync(channelId);
@@ -114,9 +119,11 @@ public static class Program
                 Logger.WriteLineWithStep($"Channel {channelId} not found, skipping.", Logger.Step.Discord, Logger.OutputType.Warning);
                 continue;
             }
-            RuntimeContext.TargetChannels.Add(channel);
+            targetChannels.Add(channel);
             Logger.WriteLineWithStep($"Target channel: {channel.Name}", Logger.Step.Discord);
         }
+
+        RuntimeContext.TargetChannels = targetChannels;
 
         // Resolve notification channel if configured, otherwise use first status channel
         if (RuntimeContext.Secrets.NotificationChannelId.HasValue)
@@ -150,6 +157,12 @@ public static class Program
         if (VersionUpdater.UpdateAvailable && (RuntimeContext.Config.AutoUpdate || VersionUpdater.IsAutoUpdateEnabled()))
         {
             await VersionUpdater.PerformUpdateAsync();
+        }
+
+        if (Interlocked.Exchange(ref _updatersStarted, 1) == 1)
+        {
+            Logger.WriteLineWithStep("Updater loops are already running; skipping duplicate startup.", Logger.Step.Initialization);
+            return;
         }
 
         StartStatsUpdater(sender);
@@ -232,7 +245,7 @@ public static class Program
                         mb.ClearComponents();
                         mb.AddComponentRows(components);
                     });
-                    await LiveMessageStorage.SaveAsync(scanned.Value);
+                    await LiveMessageStorage.SaveAsync(channel, scanned.Value);
                 }
                 else
                 {
@@ -253,7 +266,7 @@ public static class Program
             .AddComponentRows(components)
             .SendAsync(channel);
 
-        await LiveMessageStorage.SaveAsync(msg.Id);
+        await LiveMessageStorage.SaveAsync(channel, msg.Id);
     }
 
     private static void StartPaginatedUpdater(DiscordClient client)
@@ -314,7 +327,7 @@ public static class Program
                         var buttons = ComponentBuilders.BuildPaginationButtons(currentUuid, RuntimeContext.Config);
                         mb.AddComponents(buttons);
                     });
-                    await LiveMessageStorage.SaveAsync(scanned.Value, safeIndex);
+                    await LiveMessageStorage.SaveAsync(channel, scanned.Value, safeIndex);
                 }
                 else
                 {
@@ -338,41 +351,41 @@ public static class Program
             .AddComponents(buttons)
             .SendAsync(channel);
 
-        await LiveMessageStorage.SaveAsync(msg.Id, 0);
+        await LiveMessageStorage.SaveAsync(channel, msg.Id, 0);
     }
 
     private static void StartPerServerUpdater(DiscordClient client)
     {
-        var servers = ServerMonitorService.GetProcessedServerList();
-        RuntimeContext.ServerInfoCache = servers;
-
-        if (servers.Count == 0)
+        StartUpdaterLoop(async () =>
         {
-            Logger.WriteLineWithStep("No servers found for PerServer mode.", Logger.Step.EmbedBuilding);
-            return;
-        }
+            var servers = ServerMonitorService.GetProcessedServerList();
+            RuntimeContext.ServerInfoCache = servers;
 
-        foreach (var server in servers)
-        {
-            StartUpdaterLoop(async () =>
+            if (servers.Count == 0)
+            {
+                Logger.WriteLineWithStep("No servers found for PerServer mode.", Logger.Step.EmbedBuilding);
+                return;
+            }
+
+            foreach (var server in servers)
             {
                 var embed = await EmbedService.BuildSingleServerEmbedAsync(server);
 
-                if (!EmbedChangeTracker.HasChanged([server.Uuid], embed)) return;
+                if (!EmbedChangeTracker.HasChanged([server.Uuid], embed)) continue;
 
                 foreach (var channel in RuntimeContext.TargetChannels)
                 {
                     await UpdateOrCreateServerMessage(channel, embed, server);
                 }
-            }, RuntimeContext.Config.ServerUpdateInterval + Random.Shared.Next(0, 3));
-        }
+            }
+        });
     }
 
     private static async Task UpdateOrCreateServerMessage(DiscordChannel channel, DiscordEmbed embed, Models.ServerInfo server)
     {
         if (RuntimeContext.Config.DryRun) return;
 
-        var messageId = await LiveMessageStorage.GetExistingMessageIdAsync(channel);
+        var messageId = await LiveMessageStorage.GetExistingServerMessageIdAsync(channel, server.Uuid, server.Name);
         var buttons = ComponentBuilders.BuildServerButtons(server.Uuid, RuntimeContext.Config);
 
         if (messageId.HasValue)
@@ -390,7 +403,10 @@ public static class Program
             catch
             {
                 // Retry by scanning the channel for an existing bot message before creating new
-                var scanned = await LiveMessageStorage.FindExistingMessageIdInChannelAsync(channel);
+                var scanned = await LiveMessageStorage.FindExistingMessageIdInChannelAsync(
+                    channel,
+                    LiveMessageStorage.TrackedMessageKind.Status,
+                    expectedTitle: server.Name);
                 if (scanned.HasValue)
                 {
                     var msg = await channel.GetMessageAsync(scanned.Value);
@@ -400,27 +416,27 @@ public static class Program
                         mb.ClearComponents();
                         if (buttons.Count > 0) mb.AddComponents(buttons);
                     });
-                    await LiveMessageStorage.SaveAsync(scanned.Value);
+                    await LiveMessageStorage.SaveServerAsync(channel, server.Uuid, scanned.Value);
                 }
                 else
                 {
-                    await CreateNewServerMessage(channel, embed, buttons);
+                    await CreateNewServerMessage(channel, embed, buttons, server.Uuid);
                 }
             }
         }
         else
         {
-            await CreateNewServerMessage(channel, embed, buttons);
+            await CreateNewServerMessage(channel, embed, buttons, server.Uuid);
         }
     }
 
-    private static async Task CreateNewServerMessage(DiscordChannel channel, DiscordEmbed embed, List<DiscordButtonComponent> buttons)
+    private static async Task CreateNewServerMessage(DiscordChannel channel, DiscordEmbed embed, List<DiscordButtonComponent> buttons, string serverUuid)
     {
         var builder = new DiscordMessageBuilder().WithEmbed(embed);
         if (buttons.Count > 0) builder.AddComponents(buttons);
 
         var msg = await builder.SendAsync(channel);
-        await LiveMessageStorage.SaveAsync(msg.Id);
+        await LiveMessageStorage.SaveServerAsync(channel, serverUuid, msg.Id);
     }
 
     private static int CalculateUpdateDelaySeconds(int? delaySeconds)
@@ -433,11 +449,19 @@ public static class Program
     private static void StartUpdaterLoop(Func<Task> updateAction, int? delaySeconds = null)
     {
         var delay = CalculateUpdateDelaySeconds(delaySeconds);
+        var gate = new SemaphoreSlim(1, 1);
 
         Task.Run(async () =>
         {
             while (true)
             {
+                if (!await gate.WaitAsync(0))
+                {
+                    Logger.WriteLineWithStep("Previous update is still running; skipping this cycle.", Logger.Step.EmbedBuilding, Logger.OutputType.Warning);
+                    await Task.Delay(TimeSpan.FromSeconds(delay));
+                    continue;
+                }
+
                 try
                 {
                     await updateAction();
@@ -445,6 +469,10 @@ public static class Program
                 catch (Exception ex)
                 {
                     Logger.WriteLineWithStep($"Updater error: {ex.Message}", Logger.Step.EmbedBuilding, Logger.OutputType.Warning);
+                }
+                finally
+                {
+                    gate.Release();
                 }
 
                 await Task.Delay(TimeSpan.FromSeconds(delay));
@@ -471,6 +499,7 @@ public static class Program
             {
                 var metrics = await HostMetricsService.GetMetricsAsync();
                 var embed = await EmbedService.BuildHostMetricsEmbedAsync(metrics);
+                if (!EmbedChangeTracker.HasChanged(["host-metrics"], embed)) return;
 
                 if (hostMetricsMessageId.HasValue)
                 {
@@ -482,20 +511,23 @@ public static class Program
                     catch
                     {
                         // Retry by scanning the channel for an existing bot message before creating new
-                        var scanned = await LiveMessageStorage.FindExistingMessageIdInChannelAsync(RuntimeContext.HostMetricsChannel);
+                        var scanned = await LiveMessageStorage.FindExistingMessageIdInChannelAsync(
+                            RuntimeContext.HostMetricsChannel,
+                            LiveMessageStorage.TrackedMessageKind.HostMetrics,
+                            pruneDuplicates: true);
                         if (scanned.HasValue)
                         {
                             var msg = await RuntimeContext.HostMetricsChannel.GetMessageAsync(scanned.Value);
                             await msg.ModifyAsync(m => m.Embed = embed);
                             hostMetricsMessageId = scanned.Value;
-                            LiveMessageStorage.SaveHostMetrics(scanned.Value);
+                            LiveMessageStorage.SaveHostMetrics(RuntimeContext.HostMetricsChannel, scanned.Value);
                         }
                         else
                         {
                             // Message deleted, create new one
                             var newMsg = await RuntimeContext.HostMetricsChannel.SendMessageAsync(embed);
                             hostMetricsMessageId = newMsg.Id;
-                            LiveMessageStorage.SaveHostMetrics(newMsg.Id);
+                            LiveMessageStorage.SaveHostMetrics(RuntimeContext.HostMetricsChannel, newMsg.Id);
                         }
                     }
                 }
@@ -503,7 +535,7 @@ public static class Program
                 {
                     var newMsg = await RuntimeContext.HostMetricsChannel.SendMessageAsync(embed);
                     hostMetricsMessageId = newMsg.Id;
-                    LiveMessageStorage.SaveHostMetrics(newMsg.Id);
+                    LiveMessageStorage.SaveHostMetrics(RuntimeContext.HostMetricsChannel, newMsg.Id);
                 }
             }
             catch (Exception ex)

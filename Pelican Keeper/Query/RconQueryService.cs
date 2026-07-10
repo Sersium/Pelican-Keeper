@@ -80,10 +80,13 @@ public sealed class RconQueryService : IQueryService
             var response = new StringBuilder();
             do
             {
-                var buffer = new byte[4096];
-                var length = await _stream.ReadAsync(buffer);
-                if (length < 12) break;
-                response.Append(Encoding.UTF8.GetString(buffer, 12, length - 14));
+                var buffer = await ReadPacketAsync();
+                if (buffer == null || buffer.Length < 14) break;
+
+                var packetSize = BitConverter.ToInt32(buffer, 0);
+                var bodyLength = packetSize - 10;
+                if (bodyLength > 0)
+                    response.Append(Encoding.UTF8.GetString(buffer, 12, bodyLength));
             } while (_stream.DataAvailable);
 
             var responseText = response.ToString();
@@ -108,13 +111,21 @@ public sealed class RconQueryService : IQueryService
         try
         {
             var authPacket = BuildPacket(AuthPacket, _password);
+            var authId = _packetId;
             await _stream.WriteAsync(authPacket);
 
-            var buffer = new byte[4096];
-            await _stream.ReadAsync(buffer);
+            for (var i = 0; i < 2; i++)
+            {
+                var buffer = await ReadPacketAsync();
+                if (buffer == null || buffer.Length < 12) return false;
 
-            var responseId = BitConverter.ToInt32(buffer, 4);
-            return responseId != -1;
+                var responseId = BitConverter.ToInt32(buffer, 4);
+                var responseType = BitConverter.ToInt32(buffer, 8);
+                if (responseId == -1) return false;
+                if (responseType == AuthResponse && responseId == authId) return true;
+            }
+
+            return false;
         }
         catch
         {
@@ -134,6 +145,40 @@ public sealed class RconQueryService : IQueryService
         bodyBytes.CopyTo(packet, 12);
 
         return packet;
+    }
+
+    private async Task<byte[]?> ReadPacketAsync()
+    {
+        if (_stream == null) return null;
+
+        var sizeBytes = new byte[4];
+        if (!await ReadExactlyAsync(sizeBytes)) return null;
+
+        var packetSize = BitConverter.ToInt32(sizeBytes, 0);
+        if (packetSize < 10 || packetSize > 65535) return null;
+
+        var payload = new byte[packetSize];
+        if (!await ReadExactlyAsync(payload)) return null;
+
+        var packet = new byte[4 + packetSize];
+        sizeBytes.CopyTo(packet, 0);
+        payload.CopyTo(packet, 4);
+        return packet;
+    }
+
+    private async Task<bool> ReadExactlyAsync(byte[] buffer)
+    {
+        if (_stream == null) return false;
+
+        var offset = 0;
+        while (offset < buffer.Length)
+        {
+            var read = await _stream.ReadAsync(buffer.AsMemory(offset, buffer.Length - offset));
+            if (read == 0) return false;
+            offset += read;
+        }
+
+        return true;
     }
 
     private void Cleanup()

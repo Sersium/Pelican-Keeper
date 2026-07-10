@@ -34,7 +34,7 @@ public class EmbedBuilderService
 
         embed.Footer = new DiscordEmbedBuilder.EmbedFooter
         {
-            Text = $"Last Updated: {DateTime.Now:HH:mm:ss}"
+            Text = $"Pelican Keeper Status | Last Updated: {DateTime.Now:HH:mm:ss}"
         };
 
         if (RuntimeContext.Config.Debug)
@@ -69,7 +69,7 @@ public class EmbedBuilderService
 
         embed.Footer = new DiscordEmbedBuilder.EmbedFooter
         {
-            Text = $"Last Updated: {DateTime.Now:HH:mm:ss}"
+            Text = $"Pelican Keeper Status | Last Updated: {DateTime.Now:HH:mm:ss}"
         };
 
         if (RuntimeContext.Config.Debug)
@@ -107,7 +107,7 @@ public class EmbedBuilderService
 
             embed.Footer = new DiscordEmbedBuilder.EmbedFooter
             {
-                Text = $"Last Updated: {DateTime.Now:HH:mm:ss}"
+                Text = $"Pelican Keeper Status | Last Updated: {DateTime.Now:HH:mm:ss}"
             };
 
             if (RuntimeContext.Config.Debug)
@@ -172,7 +172,7 @@ public class EmbedBuilderService
 
         embed.Footer = new DiscordEmbedBuilder.EmbedFooter
         {
-            Text = $"Last Updated: {DateTime.Now:HH:mm:ss}"
+            Text = $"Pelican Keeper Host | Last Updated: {DateTime.Now:HH:mm:ss}"
         };
 
         return Task.FromResult(embed.Build());

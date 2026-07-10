@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Text.RegularExpressions;
 using Pelican_Keeper.Configuration;
 using Pelican_Keeper.Core;
@@ -200,9 +201,23 @@ public static class ServerMonitorService
     private static void QueryA2SServer(ServerInfo server, string json, GamesToMonitor config, string ip)
     {
         var port = JsonResponseParser.ExtractQueryPort(json, server.Uuid, config.QueryPortVariable);
-        if (port == 0 || string.IsNullOrEmpty(RuntimeContext.Secrets.ExternalServerIp)) return;
+        if (port == 0) return;
 
-        server.PlayerCountText = A2SQueryService.QueryAsync(ip, port).GetAwaiter().GetResult();
+        foreach (var host in GetQueryCandidateHosts(server, json, config, ip))
+        {
+            var response = A2SQueryService.QueryAsync(host, port).GetAwaiter().GetResult();
+            if (response == "N/A")
+            {
+                if (RuntimeContext.Config.Debug)
+                    Logger.WriteLineWithStep($"A2S query failed for {server.Name} via {host}:{port}", Logger.Step.A2SQuery);
+                continue;
+            }
+
+            server.PlayerCountText = response;
+            return;
+        }
+
+        server.PlayerCountText = "N/A";
     }
 
     private static void QueryRconServer(ServerInfo server, string json, GamesToMonitor config, string ip, int maxPlayers)
@@ -251,16 +266,25 @@ public static class ServerMonitorService
     {
         var existing = RconConnections.FirstOrDefault(r => r.Ip == host && r.Port == port);
         var rcon = existing ?? new RconQueryService(host, port, password);
+        string response;
 
-        rcon.ConnectAsync().GetAwaiter().GetResult();
-        var response = rcon.QueryAsync(command, extractRegex).GetAwaiter().GetResult();
+        try
+        {
+            rcon.ConnectAsync().GetAwaiter().GetResult();
+            response = rcon.QueryAsync(command, extractRegex).GetAwaiter().GetResult();
+        }
+        catch
+        {
+            response = "N/A";
+        }
 
         if (response != "N/A")
         {
             if (!RconConnections.Contains(rcon)) RconConnections.Add(rcon);
         }
-        else if (existing == null)
+        else
         {
+            RconConnections.Remove(rcon);
             rcon.Dispose();
         }
 
@@ -277,52 +301,127 @@ public static class ServerMonitorService
             return;
         }
 
-        if (string.IsNullOrEmpty(RuntimeContext.Secrets.ExternalServerIp))
+        foreach (var host in GetQueryCandidateHosts(server, json, config, ip))
         {
-            if (RuntimeContext.Config.Debug)
-                Logger.WriteLineWithStep($"ExternalServerIp not configured", Logger.Step.MinecraftJavaQuery);
-            return;
-        }
+            var allowApiFallback = CanUsePublicStatusFallback(host, ip, config);
+            using var service = new MinecraftJavaQueryService(host, port, allowApiFallback);
 
-        using var service = new MinecraftJavaQueryService(ip, port);
-        try
-        {
-            if (RuntimeContext.Config.Debug)
-                Logger.WriteLineWithStep($"Starting connection attempt for {ip}:{port}", Logger.Step.MinecraftJavaQuery);
-
-            service.ConnectAsync().GetAwaiter().GetResult();
-
-            if (RuntimeContext.Config.Debug)
-                Logger.WriteLineWithStep($"Connection succeeded, now running query for {ip}:{port}", Logger.Step.MinecraftJavaQuery);
-
-            server.PlayerCountText = service.QueryAsync().GetAwaiter().GetResult();
-
-            if (RuntimeContext.Config.Debug)
-                Logger.WriteLineWithStep($"Query completed with result: {server.PlayerCountText} for {ip}:{port}", Logger.Step.MinecraftJavaQuery);
-        }
-        catch (Exception ex)
-        {
-            if (RuntimeContext.Config.Debug)
+            try
             {
-                Logger.WriteLineWithStep($"Minecraft query caught exception for {ip}:{port}: {ex.GetType().Name}: {ex.Message}", Logger.Step.MinecraftJavaQuery);
-                Logger.WriteLineWithStep($"Calling mcstatus.io API fallback for {ip}:{port}", Logger.Step.MinecraftJavaQuery);
+                if (RuntimeContext.Config.Debug)
+                    Logger.WriteLineWithStep($"Starting connection attempt for {host}:{port}", Logger.Step.MinecraftJavaQuery);
+
+                service.ConnectAsync().GetAwaiter().GetResult();
+
+                if (RuntimeContext.Config.Debug)
+                    Logger.WriteLineWithStep($"Connection succeeded, now running query for {host}:{port}", Logger.Step.MinecraftJavaQuery);
+
+                var response = service.QueryAsync().GetAwaiter().GetResult();
+                if (response == "N/A")
+                {
+                    if (RuntimeContext.Config.Debug)
+                        Logger.WriteLineWithStep($"Minecraft query returned N/A for {host}:{port}", Logger.Step.MinecraftJavaQuery);
+                    continue;
+                }
+
+                server.PlayerCountText = response;
+
+                if (RuntimeContext.Config.Debug)
+                    Logger.WriteLineWithStep($"Query completed with result: {server.PlayerCountText} for {host}:{port}", Logger.Step.MinecraftJavaQuery);
+
+                return;
             }
-
-            server.PlayerCountText = service.QueryViaMcStatusApiAsync().GetAwaiter().GetResult();
-
-            if (RuntimeContext.Config.Debug)
-                Logger.WriteLineWithStep($"Fallback query completed with result: {server.PlayerCountText} for {ip}:{port}", Logger.Step.MinecraftJavaQuery);
+            catch (Exception ex)
+            {
+                if (RuntimeContext.Config.Debug)
+                    Logger.WriteLineWithStep($"Minecraft query failed for {host}:{port}: {ex.GetType().Name}: {ex.Message}", Logger.Step.MinecraftJavaQuery);
+            }
         }
+
+        server.PlayerCountText = "N/A";
     }
 
     private static void QueryMinecraftBedrockServer(ServerInfo server, string json, GamesToMonitor config, string ip)
     {
         var port = JsonResponseParser.ExtractQueryPort(json, server.Uuid, config.QueryPortVariable);
-        if (port == 0 || string.IsNullOrEmpty(RuntimeContext.Secrets.ExternalServerIp)) return;
+        if (port == 0) return;
 
-        using var service = new MinecraftBedrockQueryService(ip, port);
-        service.ConnectAsync().GetAwaiter().GetResult();
-        server.PlayerCountText = service.QueryAsync().GetAwaiter().GetResult();
+        foreach (var host in GetQueryCandidateHosts(server, json, config, ip))
+        {
+            using var service = new MinecraftBedrockQueryService(host, port);
+            try
+            {
+                service.ConnectAsync().GetAwaiter().GetResult();
+                var response = service.QueryAsync().GetAwaiter().GetResult();
+                if (response == "N/A")
+                {
+                    if (RuntimeContext.Config.Debug)
+                        Logger.WriteLineWithStep($"Minecraft Bedrock query failed for {server.Name} via {host}:{port}", Logger.Step.MinecraftBedrockQuery);
+                    continue;
+                }
+
+                server.PlayerCountText = response;
+                return;
+            }
+            catch (Exception ex)
+            {
+                if (RuntimeContext.Config.Debug)
+                    Logger.WriteLineWithStep($"Minecraft Bedrock query failed for {host}:{port}: {ex.Message}", Logger.Step.MinecraftBedrockQuery);
+            }
+        }
+
+        server.PlayerCountText = "N/A";
+    }
+
+    private static IEnumerable<string> GetQueryCandidateHosts(ServerInfo server, string json, GamesToMonitor config, string queryIp)
+    {
+        var hosts = new List<string?>
+        {
+            config.QueryHost,
+            JsonResponseParser.ExtractServerVariableValue(json, server.Uuid, config.QueryHostVariable),
+            queryIp,
+            server.Uuid
+        };
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var host in hosts)
+        {
+            if (string.IsNullOrWhiteSpace(host) || host == "N/A") continue;
+            if (seen.Add(host)) yield return host;
+        }
+    }
+
+    private static bool CanUsePublicStatusFallback(string host, string queryIp, GamesToMonitor config)
+    {
+        if (!string.Equals(host, queryIp, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(host, RuntimeContext.Secrets.ExternalServerIp, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(host, config.QueryHost, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return IsPubliclyResolvableHost(host);
+    }
+
+    private static bool IsPubliclyResolvableHost(string host)
+    {
+        if (IPAddress.TryParse(host, out var address))
+            return !IsPrivateOrLoopbackAddress(address);
+
+        return host.Contains('.', StringComparison.Ordinal)
+               && !host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+               && !host.EndsWith(".local", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPrivateOrLoopbackAddress(IPAddress address)
+    {
+        if (IPAddress.IsLoopback(address)) return true;
+
+        var bytes = address.GetAddressBytes();
+        return address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
+               && (bytes[0] == 10
+                   || bytes[0] == 127
+                   || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
+                   || (bytes[0] == 192 && bytes[1] == 168)
+                   || (bytes[0] == 169 && bytes[1] == 254));
     }
 
     private static void ProcessAutoShutdown(ServerInfo server)

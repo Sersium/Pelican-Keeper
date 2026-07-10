@@ -1,4 +1,3 @@
-using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
@@ -21,13 +20,12 @@ public static class A2SQueryService
 
         try
         {
-            var endpoint = new IPEndPoint(IPAddress.Parse(ip), port);
-            client.Connect(endpoint);
+            client.Connect(ip, port);
 
             var request = BuildInfoRequest();
             await client.SendAsync(request);
 
-            var response = await ReceiveWithChallengeAsync(client, endpoint);
+            var response = await ReceiveWithChallengeAsync(client);
             return ParseInfoResponse(response);
         }
         catch
@@ -54,7 +52,7 @@ public static class A2SQueryService
         return packet;
     }
 
-    private static async Task<byte[]> ReceiveWithChallengeAsync(UdpClient client, IPEndPoint endpoint)
+    private static async Task<byte[]> ReceiveWithChallengeAsync(UdpClient client)
     {
         var result = await client.ReceiveAsync();
         var data = result.Buffer;

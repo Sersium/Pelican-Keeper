@@ -15,12 +15,12 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5.4.0
         with:
-          dotnet-version: "8.x"
+          dotnet-version: "10.x"
 
       - name: Restore dependencies
         run: dotnet restore
@@ -50,10 +50,10 @@ jobs:
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Create Release
         id: create_release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3.0.1
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
@@ -70,12 +70,12 @@ jobs:
       APP_NAME: "Pelican-Keeper"
       RID: "linux-x64"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5.4.0
         with:
-          dotnet-version: "8.x"
+          dotnet-version: "10.x"
 
       - name: Restore
         run: dotnet restore "$PROJECT_PATH" -r $RID
@@ -102,7 +102,7 @@ jobs:
           echo "zip_path=dist/$NAME" >> $GITHUB_OUTPUT
 
       - name: Upload Release Asset
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3.0.1
         with:
           tag_name: ${{ github.ref_name }}
           files: ${{ steps.zip_output.outputs.zip_path }}

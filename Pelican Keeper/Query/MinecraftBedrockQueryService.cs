@@ -1,4 +1,3 @@
-using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
@@ -33,7 +32,7 @@ public sealed class MinecraftBedrockQueryService : IQueryService
     public Task ConnectAsync()
     {
         _client = new UdpClient { Client = { ReceiveTimeout = Timeout, SendTimeout = Timeout } };
-        _client.Connect(new IPEndPoint(IPAddress.Parse(Ip), Port));
+        _client.Connect(Ip, Port);
         return Task.CompletedTask;
     }
 

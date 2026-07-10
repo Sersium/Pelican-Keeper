@@ -38,6 +38,20 @@ public class PlayerCountResponseTesting
     }
 
     [Test]
+    public void TestEmbeddedPlayerCountFormatting()
+    {
+        var formatted = PlayerCountHelper.FormatPlayerCount("Players online: 7/32", 32);
+        Assert.That(formatted, Is.EqualTo("7/32"), "Should extract player counts embedded in RCON text.");
+    }
+
+    [Test]
+    public void TestCustomRegexGroupFormatting()
+    {
+        var count = PlayerCountHelper.ExtractPlayerCount("CurrentPlayers=9", @"CurrentPlayers=(\d+)");
+        Assert.That(count, Is.EqualTo(9), "Should use the first capture group from custom regex patterns.");
+    }
+
+    [Test]
     public void TestPalworldPlayerCountFormatting()
     {
         const string response = "name,playeruid,steamid\nPlayerOne,123,76561198000000001\nPlayerTwo,456,76561198000000002";

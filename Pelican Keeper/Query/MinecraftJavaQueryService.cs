@@ -9,8 +9,10 @@ namespace Pelican_Keeper.Query;
 /// </summary>
 public sealed class MinecraftJavaQueryService : IQueryService
 {
+    private static readonly HttpClient McStatusClient = new() { Timeout = TimeSpan.FromSeconds(5) };
     private TcpClient? _client;
     private NetworkStream? _stream;
+    private readonly bool _allowApiFallback;
     private bool _disposed;
 
     /// <inheritdoc />
@@ -20,21 +22,29 @@ public sealed class MinecraftJavaQueryService : IQueryService
     public int Port { get; set; }
 
     private const int Timeout = 5000;
+    private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(3);
 
     /// <summary>
     /// Initializes a new Minecraft Java query service.
     /// </summary>
-    public MinecraftJavaQueryService(string ip, int port)
+    public MinecraftJavaQueryService(string ip, int port, bool allowApiFallback = true)
     {
         Ip = ip;
         Port = port;
+        _allowApiFallback = allowApiFallback;
     }
 
     /// <inheritdoc />
     public async Task ConnectAsync()
     {
         _client = new TcpClient { ReceiveTimeout = Timeout, SendTimeout = Timeout };
-        await _client.ConnectAsync(Ip, Port);
+        var connectTask = _client.ConnectAsync(Ip, Port);
+        var timeoutTask = Task.Delay(ConnectTimeout);
+
+        if (await Task.WhenAny(connectTask, timeoutTask) != connectTask)
+            throw new TimeoutException($"Minecraft Java connection timed out for {Ip}:{Port}");
+
+        await connectTask;
         _stream = _client.GetStream();
     }
 
@@ -56,8 +66,7 @@ public sealed class MinecraftJavaQueryService : IQueryService
         }
         catch (Exception)
         {
-            // Direct query failed, try mcstatus.io API fallback
-            return await QueryViaMcStatusApiAsync();
+            return _allowApiFallback ? await QueryViaMcStatusApiAsync() : "N/A";
         }
     }
 
@@ -68,8 +77,7 @@ public sealed class MinecraftJavaQueryService : IQueryService
             var url = $"https://api.mcstatus.io/v2/status/java/{Ip}:{Port}";
             Logger.WriteLineWithStep($"Using mcstatus.io API fallback for {Ip}:{Port}", Logger.Step.MinecraftJavaQuery);
 
-            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-            var response = await httpClient.GetStringAsync(url);
+            var response = await McStatusClient.GetStringAsync(url);
 
             // Parse JSON response to extract player counts from "players" object
             var onlineMatch = System.Text.RegularExpressions.Regex.Match(response, "\"players\":\\s*\\{[^}]*\"online\":(\\d+)");
@@ -176,7 +184,10 @@ public sealed class MinecraftJavaQueryService : IQueryService
 
         do
         {
-            currentByte = (byte)stream.ReadByte();
+            var raw = stream.ReadByte();
+            if (raw < 0) throw new EndOfStreamException();
+
+            currentByte = (byte)raw;
             value |= (currentByte & 0x7F) << position;
             position += 7;
 

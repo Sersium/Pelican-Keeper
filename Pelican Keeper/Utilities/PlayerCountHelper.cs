@@ -31,6 +31,13 @@ public static class PlayerCountHelper
             return count;
         }
 
+        // Embedded standard format: "Players: 5/20"
+        var embeddedStandard = Regex.Match(response, @"(?<!\d)(\d+)\s*/\s*(\d+)(?!\d)");
+        if (embeddedStandard.Success && int.TryParse(embeddedStandard.Groups[1].Value, out var embeddedCount))
+        {
+            return embeddedCount;
+        }
+
         // Raw numeric response, typically from an extraction regex.
         if (Regex.IsMatch(response.Trim(), @"^\d+$") && int.TryParse(response.Trim(), out var rawCount))
         {
@@ -65,7 +72,8 @@ public static class PlayerCountHelper
         if (!string.IsNullOrEmpty(customPattern))
         {
             var custom = Regex.Match(response, customPattern);
-            if (custom.Success && int.TryParse(custom.Value, out var customCount))
+            var value = custom.Success && custom.Groups.Count > 1 ? custom.Groups[1].Value : custom.Value;
+            if (custom.Success && int.TryParse(value, out var customCount))
             {
                 return customCount;
             }

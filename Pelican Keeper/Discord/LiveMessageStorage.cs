@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using DSharpPlus.Entities;
 using Pelican_Keeper.Core;
@@ -11,8 +12,18 @@ namespace Pelican_Keeper.Discord;
 /// </summary>
 public static class LiveMessageStorage
 {
+    private static readonly object CacheLock = new();
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private static string _historyFilePath = "MessageHistory.json";
+
     internal static LiveMessageJsonStorage? Cache { get; private set; }
+
+    public enum TrackedMessageKind
+    {
+        Status,
+        HostMetrics,
+        Any
+    }
 
     static LiveMessageStorage()
     {
@@ -47,9 +58,7 @@ public static class LiveMessageStorage
                 return null;
             }
 
-            using var file = File.Create("MessageHistory.json");
-            using var writer = new StreamWriter(file);
-            writer.Write(JsonSerializer.Serialize(new LiveMessageJsonStorage()));
+            File.WriteAllText("MessageHistory.json", JsonSerializer.Serialize(new LiveMessageJsonStorage(), JsonOptions));
             path = Configuration.FileManager.GetFilePath("MessageHistory.json", silent: true);
 
             if (path == string.Empty)
@@ -65,25 +74,85 @@ public static class LiveMessageStorage
             _historyFilePath = path;
             Logger.WriteLineWithStep($"Loaded MessageHistory.json from: {path}", Logger.Step.MessageHistory);
             Cache = JsonSerializer.Deserialize<LiveMessageJsonStorage>(json) ?? new LiveMessageJsonStorage();
+            NormalizeCache();
             return Cache;
         }
         catch (Exception ex)
         {
             Logger.WriteLineWithStep("Error loading message cache. Delete MessageHistory.json to recreate.", Logger.Step.MessageHistory, Logger.OutputType.Error, ex);
-            return new LiveMessageJsonStorage();
+            Cache = new LiveMessageJsonStorage();
+            NormalizeCache();
+            return Cache;
         }
     }
 
     /// <summary>
-    /// Saves a message ID to the cache (non-paginated).
+    /// Saves a message ID to the cache (legacy non-paginated storage).
     /// </summary>
     public static void Save(ulong messageId)
     {
-        if (Cache?.LiveStore == null) return;
-        if (Cache.LiveStore.Contains(messageId)) return;
+        lock (CacheLock)
+        {
+            NormalizeCache();
+            if (Cache!.LiveStore!.Contains(messageId)) return;
 
-        Cache.LiveStore.Add(messageId);
-        PersistCache();
+            Cache.LiveStore.Add(messageId);
+            PersistCacheUnsafe();
+        }
+    }
+
+    /// <summary>
+    /// Saves a non-paginated message ID for a specific channel.
+    /// </summary>
+    public static void Save(DiscordChannel channel, ulong messageId)
+    {
+        lock (CacheLock)
+        {
+            NormalizeCache();
+            var key = ChannelKey(channel);
+            var changed = false;
+
+            if (!Cache!.LiveStore!.Contains(messageId))
+            {
+                Cache.LiveStore.Add(messageId);
+                changed = true;
+            }
+
+            if (!Cache.ChannelLiveStore!.TryGetValue(key, out var existing) || existing != messageId)
+            {
+                Cache.ChannelLiveStore[key] = messageId;
+                changed = true;
+            }
+
+            if (changed) PersistCacheUnsafe();
+        }
+    }
+
+    /// <summary>
+    /// Saves a per-server message ID for a specific channel and server.
+    /// </summary>
+    public static void SaveServer(DiscordChannel channel, string serverUuid, ulong messageId)
+    {
+        lock (CacheLock)
+        {
+            NormalizeCache();
+            var key = ServerKey(channel, serverUuid);
+            var changed = false;
+
+            if (!Cache!.LiveStore!.Contains(messageId))
+            {
+                Cache.LiveStore.Add(messageId);
+                changed = true;
+            }
+
+            if (!Cache.ServerLiveStore!.TryGetValue(key, out var existing) || existing != messageId)
+            {
+                Cache.ServerLiveStore[key] = messageId;
+                changed = true;
+            }
+
+            if (changed) PersistCacheUnsafe();
+        }
     }
 
     /// <summary>
@@ -91,44 +160,137 @@ public static class LiveMessageStorage
     /// </summary>
     public static void Save(ulong messageId, int pageIndex)
     {
-        if (Cache?.PaginatedLiveStore == null) return;
-
-        if (Cache.PaginatedLiveStore.TryGetValue(messageId, out var existing))
+        lock (CacheLock)
         {
-            if (existing == pageIndex) return;
-            Cache.PaginatedLiveStore[messageId] = pageIndex;
-        }
-        else
-        {
-            Cache.PaginatedLiveStore[messageId] = pageIndex;
-        }
+            NormalizeCache();
+            if (Cache!.PaginatedLiveStore!.TryGetValue(messageId, out var existing) && existing == pageIndex) return;
 
-        PersistCache();
+            Cache.PaginatedLiveStore[messageId] = pageIndex;
+            PersistCacheUnsafe();
+        }
     }
 
     /// <summary>
-    /// Saves the host metrics message ID to the cache.
+    /// Saves a paginated message for a specific channel.
+    /// </summary>
+    public static void Save(DiscordChannel channel, ulong messageId, int pageIndex)
+    {
+        lock (CacheLock)
+        {
+            NormalizeCache();
+            var key = ChannelKey(channel);
+            var changed = false;
+
+            if (!Cache!.PaginatedLiveStore!.TryGetValue(messageId, out var existingPage) || existingPage != pageIndex)
+            {
+                Cache.PaginatedLiveStore[messageId] = pageIndex;
+                changed = true;
+            }
+
+            if (!Cache.ChannelPaginatedLiveStore!.TryGetValue(key, out var existing)
+                || existing.MessageId != messageId
+                || existing.PageIndex != pageIndex)
+            {
+                Cache.ChannelPaginatedLiveStore[key] = new ChannelPaginatedMessage { MessageId = messageId, PageIndex = pageIndex };
+                changed = true;
+            }
+
+            if (changed) PersistCacheUnsafe();
+        }
+    }
+
+    /// <summary>
+    /// Saves the host metrics message ID to the legacy cache.
     /// </summary>
     public static void SaveHostMetrics(ulong messageId)
     {
-        if (Cache == null) return;
-        if (Cache.HostMetricsMessageId == messageId) return;
+        lock (CacheLock)
+        {
+            NormalizeCache();
+            if (Cache!.HostMetricsMessageId == messageId) return;
 
-        Cache.HostMetricsMessageId = messageId;
-        PersistCache();
+            Cache.HostMetricsMessageId = messageId;
+            PersistCacheUnsafe();
+        }
     }
 
     /// <summary>
-    /// Removes a message ID from the cache.
+    /// Saves the host metrics message ID for a specific channel.
+    /// </summary>
+    public static void SaveHostMetrics(DiscordChannel channel, ulong messageId)
+    {
+        lock (CacheLock)
+        {
+            NormalizeCache();
+            var key = ChannelKey(channel);
+            var changed = false;
+
+            if (Cache!.HostMetricsMessageId != messageId)
+            {
+                Cache.HostMetricsMessageId = messageId;
+                changed = true;
+            }
+
+            if (!Cache.HostMetricsMessageIds!.TryGetValue(key, out var existing) || existing != messageId)
+            {
+                Cache.HostMetricsMessageIds[key] = messageId;
+                changed = true;
+            }
+
+            if (changed) PersistCacheUnsafe();
+        }
+    }
+
+    /// <summary>
+    /// Removes a message ID from every cache shape.
     /// </summary>
     public static void Remove(ulong? messageId)
     {
-        if (messageId == null || Cache == null) return;
+        if (messageId == null) return;
 
-        var removed = Cache.LiveStore?.Remove((ulong)messageId) ?? false;
-        removed |= Cache.PaginatedLiveStore?.Remove((ulong)messageId) ?? false;
+        lock (CacheLock)
+        {
+            NormalizeCache();
+            var id = messageId.Value;
+            var removed = Cache!.LiveStore!.Remove(id);
+            removed |= Cache.PaginatedLiveStore!.Remove(id);
+            var channelLiveStore = Cache.ChannelLiveStore!;
+            var serverLiveStore = Cache.ServerLiveStore!;
+            var channelPaginatedLiveStore = Cache.ChannelPaginatedLiveStore!;
+            var hostMetricsMessageIds = Cache.HostMetricsMessageIds!;
 
-        if (removed) PersistCache();
+            foreach (var key in channelLiveStore.Where(kvp => kvp.Value == id).Select(kvp => kvp.Key).ToList())
+            {
+                channelLiveStore.Remove(key);
+                removed = true;
+            }
+
+            foreach (var key in serverLiveStore.Where(kvp => kvp.Value == id).Select(kvp => kvp.Key).ToList())
+            {
+                serverLiveStore.Remove(key);
+                removed = true;
+            }
+
+            foreach (var key in channelPaginatedLiveStore.Where(kvp => kvp.Value.MessageId == id).Select(kvp => kvp.Key).ToList())
+            {
+                channelPaginatedLiveStore.Remove(key);
+                removed = true;
+            }
+
+            foreach (var key in hostMetricsMessageIds.Where(kvp => kvp.Value == id).Select(kvp => kvp.Key).ToList())
+            {
+                hostMetricsMessageIds.Remove(key);
+                removed = true;
+            }
+
+            if (Cache.HostMetricsMessageId == id)
+            {
+                Cache.HostMetricsMessageId = null;
+                removed = true;
+            }
+
+            if (removed) PersistCacheUnsafe();
+        }
     }
 
     /// <summary>
@@ -136,8 +298,13 @@ public static class LiveMessageStorage
     /// </summary>
     public static ulong? Get(ulong? messageId)
     {
-        if (Cache?.LiveStore == null || messageId == null) return null;
-        return Cache.LiveStore.Contains((ulong)messageId) ? messageId : null;
+        if (messageId == null) return null;
+
+        lock (CacheLock)
+        {
+            NormalizeCache();
+            return Cache!.LiveStore!.Contains(messageId.Value) ? messageId : null;
+        }
     }
 
     /// <summary>
@@ -145,10 +312,39 @@ public static class LiveMessageStorage
     /// </summary>
     public static async Task<ulong?> GetExistingHostMetricsMessageAsync(DiscordChannel? channel)
     {
-        if (Cache?.HostMetricsMessageId == null || channel == null) return null;
+        if (channel == null) return null;
 
-        var exists = await MessageExistsAsync([channel], Cache.HostMetricsMessageId.Value);
-        return exists ? Cache.HostMetricsMessageId : null;
+        var key = ChannelKey(channel);
+        ulong? channelMessageId;
+        ulong? legacyMessageId;
+
+        lock (CacheLock)
+        {
+            NormalizeCache();
+            channelMessageId = Cache!.HostMetricsMessageIds!.GetValueOrDefault(key);
+            legacyMessageId = Cache.HostMetricsMessageId;
+        }
+
+        if (channelMessageId.HasValue && await MessageExistsAsync([channel], channelMessageId.Value))
+            return channelMessageId;
+
+        if (channelMessageId.HasValue)
+            Remove(channelMessageId);
+
+        if (legacyMessageId.HasValue && await MessageExistsAsync([channel], legacyMessageId.Value))
+        {
+            SaveHostMetrics(channel, legacyMessageId.Value);
+            return legacyMessageId;
+        }
+
+        var scanned = await FindExistingMessageIdInChannelAsync(channel, TrackedMessageKind.HostMetrics, pruneDuplicates: true);
+        if (scanned.HasValue)
+        {
+            SaveHostMetrics(channel, scanned.Value);
+            return scanned.Value;
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -156,8 +352,13 @@ public static class LiveMessageStorage
     /// </summary>
     public static int? GetPaginated(ulong? messageId)
     {
-        if (Cache?.PaginatedLiveStore == null || messageId == null) return null;
-        return Cache.PaginatedLiveStore.TryGetValue((ulong)messageId, out var index) ? index : null;
+        if (messageId == null) return null;
+
+        lock (CacheLock)
+        {
+            NormalizeCache();
+            return Cache!.PaginatedLiveStore!.TryGetValue(messageId.Value, out var index) ? index : null;
+        }
     }
 
     /// <summary>
@@ -202,37 +403,114 @@ public static class LiveMessageStorage
         var channels = RuntimeContext.TargetChannels;
         if (channels.Count == 0) return;
 
+        var changed = false;
+
         if (Cache?.LiveStore != null)
         {
-            var filtered = await Cache.LiveStore
-                .ToAsyncEnumerable()
-                .WhereAwait(async id => await MessageExistsAsync(channels, id))
-                .ToHashSetAsync();
-            Cache.LiveStore = filtered;
+            var valid = new HashSet<ulong>();
+            foreach (var id in Cache.LiveStore.ToList())
+            {
+                if (await MessageExistsAsync(channels, id))
+                    valid.Add(id);
+                else
+                    changed = true;
+            }
+
+            Cache.LiveStore = valid;
         }
 
         if (Cache?.PaginatedLiveStore != null)
         {
-            var filtered = await Cache.PaginatedLiveStore
-                .ToAsyncEnumerable()
-                .WhereAwait(async kvp => await MessageExistsAsync(channels, kvp.Key))
-                .ToDictionaryAsync(kvp => kvp.Key, kvp => kvp.Value);
-            Cache.PaginatedLiveStore = filtered;
+            foreach (var kvp in Cache.PaginatedLiveStore.ToList())
+            {
+                if (await MessageExistsAsync(channels, kvp.Key)) continue;
+                Cache.PaginatedLiveStore.Remove(kvp.Key);
+                changed = true;
+            }
+        }
+
+        if (Cache?.ChannelLiveStore != null)
+        {
+            foreach (var kvp in Cache.ChannelLiveStore.ToList())
+            {
+                var channel = channels.FirstOrDefault(c => ChannelKey(c) == kvp.Key);
+                if (channel == null || await MessageExistsAsync([channel], kvp.Value)) continue;
+                Cache.ChannelLiveStore.Remove(kvp.Key);
+                changed = true;
+            }
+        }
+
+        if (Cache?.ServerLiveStore != null)
+        {
+            foreach (var kvp in Cache.ServerLiveStore.ToList())
+            {
+                var separatorIndex = kvp.Key.IndexOf(':', StringComparison.Ordinal);
+                var channelKey = separatorIndex > 0 ? kvp.Key[..separatorIndex] : kvp.Key;
+                var channel = channels.FirstOrDefault(c => ChannelKey(c) == channelKey);
+                if (channel == null || await MessageExistsAsync([channel], kvp.Value)) continue;
+                Cache.ServerLiveStore.Remove(kvp.Key);
+                changed = true;
+            }
+        }
+
+        if (Cache?.ChannelPaginatedLiveStore != null)
+        {
+            foreach (var kvp in Cache.ChannelPaginatedLiveStore.ToList())
+            {
+                var channel = channels.FirstOrDefault(c => ChannelKey(c) == kvp.Key);
+                if (channel == null || await MessageExistsAsync([channel], kvp.Value.MessageId)) continue;
+                Cache.ChannelPaginatedLiveStore.Remove(kvp.Key);
+                changed = true;
+            }
+        }
+
+        if (Cache?.HostMetricsMessageIds != null && RuntimeContext.HostMetricsChannel != null)
+        {
+            foreach (var kvp in Cache.HostMetricsMessageIds.ToList())
+            {
+                var channel = ChannelKey(RuntimeContext.HostMetricsChannel) == kvp.Key
+                    ? RuntimeContext.HostMetricsChannel
+                    : null;
+
+                if (channel == null || await MessageExistsAsync([channel], kvp.Value)) continue;
+                Cache.HostMetricsMessageIds.Remove(kvp.Key);
+                changed = true;
+            }
         }
 
         if (RuntimeContext.HostMetricsChannel != null && Cache?.HostMetricsMessageId != null)
         {
             var exists = await MessageExistsAsync([RuntimeContext.HostMetricsChannel], Cache.HostMetricsMessageId.Value);
             if (!exists)
+            {
                 Cache.HostMetricsMessageId = null;
+                changed = true;
+            }
         }
 
-        PersistCache();
+        if (changed) PersistCache();
     }
 
     private static void PersistCache()
     {
-        File.WriteAllText(_historyFilePath, JsonSerializer.Serialize(Cache, new JsonSerializerOptions { WriteIndented = true }));
+        lock (CacheLock)
+        {
+            NormalizeCache();
+            PersistCacheUnsafe();
+        }
+    }
+
+    private static void PersistCacheUnsafe()
+    {
+        var targetPath = Path.GetFullPath(_historyFilePath);
+        var directory = Path.GetDirectoryName(targetPath);
+        if (!string.IsNullOrEmpty(directory))
+            Directory.CreateDirectory(directory);
+
+        var tempPath = Path.Combine(directory ?? ".", $"{Path.GetFileName(targetPath)}.{Guid.NewGuid():N}.tmp");
+        var json = JsonSerializer.Serialize(Cache, JsonOptions);
+        File.WriteAllText(tempPath, json);
+        File.Move(tempPath, targetPath, overwrite: true);
     }
 
     /// <summary>
@@ -241,6 +519,24 @@ public static class LiveMessageStorage
     public static Task SaveAsync(ulong messageId)
     {
         Save(messageId);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Saves a message ID to the cache asynchronously for a specific channel.
+    /// </summary>
+    public static Task SaveAsync(DiscordChannel channel, ulong messageId)
+    {
+        Save(channel, messageId);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Saves a per-server message ID asynchronously for a specific channel and server.
+    /// </summary>
+    public static Task SaveServerAsync(DiscordChannel channel, string serverUuid, ulong messageId)
+    {
+        SaveServer(channel, serverUuid, messageId);
         return Task.CompletedTask;
     }
 
@@ -254,23 +550,81 @@ public static class LiveMessageStorage
     }
 
     /// <summary>
+    /// Saves a paginated message with its current page index asynchronously for a specific channel.
+    /// </summary>
+    public static Task SaveAsync(DiscordChannel channel, ulong messageId, int pageIndex)
+    {
+        Save(channel, messageId, pageIndex);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
     /// Gets an existing message ID from the cache for a specific channel.
     /// </summary>
     public static async Task<ulong?> GetExistingMessageIdAsync(DiscordChannel channel)
     {
-        if (Cache?.LiveStore == null) return null;
+        var key = ChannelKey(channel);
+        ulong? channelMessageId;
+        List<ulong> legacyIds;
 
-        foreach (var id in Cache.LiveStore.ToList())
+        lock (CacheLock)
         {
-            if (await MessageExistsAsync([channel], id))
-                return id;
+            NormalizeCache();
+            channelMessageId = Cache!.ChannelLiveStore!.GetValueOrDefault(key);
+            legacyIds = Cache.LiveStore!.ToList();
         }
 
-        // Fallback: scan channel for an existing bot-authored message and reuse it
-        var scanned = await FindExistingMessageIdInChannelAsync(channel);
+        if (channelMessageId.HasValue && await MessageExistsAsync([channel], channelMessageId.Value))
+            return channelMessageId;
+
+        if (channelMessageId.HasValue)
+            Remove(channelMessageId);
+
+        foreach (var id in legacyIds)
+        {
+            if (!await MessageExistsAsync([channel], id)) continue;
+            Save(channel, id);
+            return id;
+        }
+
+        var scanned = await FindExistingMessageIdInChannelAsync(channel, TrackedMessageKind.Status);
         if (scanned.HasValue)
         {
-            Save(scanned.Value);
+            Save(channel, scanned.Value);
+            return scanned.Value;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Gets an existing per-server message ID from the cache for a specific channel and server.
+    /// </summary>
+    public static async Task<ulong?> GetExistingServerMessageIdAsync(DiscordChannel channel, string serverUuid, string serverName)
+    {
+        var key = ServerKey(channel, serverUuid);
+        ulong? messageId;
+
+        lock (CacheLock)
+        {
+            NormalizeCache();
+            messageId = Cache!.ServerLiveStore!.GetValueOrDefault(key);
+        }
+
+        if (messageId.HasValue && await MessageExistsAsync([channel], messageId.Value))
+            return messageId;
+
+        if (messageId.HasValue)
+            Remove(messageId);
+
+        var scanned = await FindExistingMessageIdInChannelAsync(
+            channel,
+            TrackedMessageKind.Status,
+            expectedTitle: serverName);
+
+        if (scanned.HasValue)
+        {
+            SaveServer(channel, serverUuid, scanned.Value);
             return scanned.Value;
         }
 
@@ -282,19 +636,34 @@ public static class LiveMessageStorage
     /// </summary>
     public static async Task<(ulong? messageId, int? pageIndex)> GetExistingPaginatedMessageAsync(DiscordChannel channel)
     {
-        if (Cache?.PaginatedLiveStore == null) return (null, null);
+        var key = ChannelKey(channel);
+        ChannelPaginatedMessage? channelState;
+        List<KeyValuePair<ulong, int>> legacyStates;
 
-        foreach (var kvp in Cache.PaginatedLiveStore.ToList())
+        lock (CacheLock)
         {
-            if (await MessageExistsAsync([channel], kvp.Key))
-                return (kvp.Key, kvp.Value);
+            NormalizeCache();
+            Cache!.ChannelPaginatedLiveStore!.TryGetValue(key, out channelState);
+            legacyStates = Cache.PaginatedLiveStore!.ToList();
         }
 
-        // Fallback: scan channel for an existing bot-authored message and reuse it.
-        var scanned = await FindExistingMessageIdInChannelAsync(channel);
+        if (channelState != null && await MessageExistsAsync([channel], channelState.MessageId))
+            return (channelState.MessageId, channelState.PageIndex);
+
+        if (channelState != null)
+            Remove(channelState.MessageId);
+
+        foreach (var kvp in legacyStates)
+        {
+            if (!await MessageExistsAsync([channel], kvp.Key)) continue;
+            Save(channel, kvp.Key, kvp.Value);
+            return (kvp.Key, kvp.Value);
+        }
+
+        var scanned = await FindExistingMessageIdInChannelAsync(channel, TrackedMessageKind.Status);
         if (scanned.HasValue)
         {
-            Save(scanned.Value, 0);
+            Save(channel, scanned.Value, 0);
             return (scanned.Value, 0);
         }
 
@@ -302,18 +671,34 @@ public static class LiveMessageStorage
     }
 
     /// <summary>
-    /// Scans a channel for a recent message authored by a bot and returns its ID.
-    /// Prefer messages that contain embeds, which matches our typical output.
+    /// Scans a channel for a recent Pelican Keeper message and returns its ID.
     /// </summary>
-    public static async Task<ulong?> FindExistingMessageIdInChannelAsync(DiscordChannel channel)
+    public static Task<ulong?> FindExistingMessageIdInChannelAsync(DiscordChannel channel)
+        => FindExistingMessageIdInChannelAsync(channel, TrackedMessageKind.Status);
+
+    /// <summary>
+    /// Scans a channel for a recent Pelican Keeper message and removes clear duplicates.
+    /// </summary>
+    public static async Task<ulong?> FindExistingMessageIdInChannelAsync(
+        DiscordChannel channel,
+        TrackedMessageKind kind,
+        bool pruneDuplicates = false,
+        string? expectedTitle = null)
     {
         try
         {
             var messages = await channel.GetMessagesAsync(100);
-            var candidate = messages
-                .FirstOrDefault(m => m.Author != null && m.Author.IsBot && (m.Embeds?.Count ?? 0) > 0);
+            var candidates = messages
+                .Where(m => IsCandidateMessage(m, kind, expectedTitle))
+                .ToList();
 
-            return candidate?.Id;
+            var candidate = candidates.FirstOrDefault();
+            if (candidate == null) return null;
+
+            if (pruneDuplicates && candidates.Count > 1)
+                await PruneDuplicateMessagesAsync(candidates.Skip(1));
+
+            return candidate.Id;
         }
         catch (Exception ex)
         {
@@ -322,4 +707,80 @@ public static class LiveMessageStorage
             return null;
         }
     }
+
+    private static async Task PruneDuplicateMessagesAsync(IEnumerable<DiscordMessage> duplicates)
+    {
+        foreach (var duplicate in duplicates)
+        {
+            try
+            {
+                await duplicate.DeleteAsync();
+                if (RuntimeContext.Config.Debug)
+                    Logger.WriteLineWithStep($"Removed duplicate message {duplicate.Id}", Logger.Step.MessageHistory);
+            }
+            catch (DSharpPlus.Exceptions.NotFoundException)
+            {
+                // Already gone.
+            }
+            catch (Exception ex)
+            {
+                if (RuntimeContext.Config.Debug)
+                    Logger.WriteLineWithStep($"Failed to remove duplicate message {duplicate.Id}: {ex.Message}", Logger.Step.MessageHistory, Logger.OutputType.Warning);
+            }
+        }
+    }
+
+    private static bool IsCandidateMessage(DiscordMessage message, TrackedMessageKind kind, string? expectedTitle = null)
+    {
+        if (message.Author?.IsBot != true || (message.Embeds?.Count ?? 0) == 0)
+            return false;
+
+        return message.Embeds!.Any(embed => kind switch
+        {
+            TrackedMessageKind.HostMetrics => IsHostMetricsEmbed(embed),
+            TrackedMessageKind.Status => IsStatusEmbed(embed, expectedTitle),
+            _ => IsHostMetricsEmbed(embed) || IsStatusEmbed(embed, expectedTitle)
+        });
+    }
+
+    private static bool IsHostMetricsEmbed(DiscordEmbed embed)
+    {
+        var title = embed.Title ?? string.Empty;
+        var footer = embed.Footer?.Text ?? string.Empty;
+
+        return title.Contains("Host System Metrics", StringComparison.OrdinalIgnoreCase)
+               || footer.Contains("Pelican Keeper Host", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsStatusEmbed(DiscordEmbed embed, string? expectedTitle = null)
+    {
+        if (IsHostMetricsEmbed(embed)) return false;
+
+        if (!string.IsNullOrWhiteSpace(expectedTitle)
+            && !string.Equals(embed.Title?.Trim(), expectedTitle.Trim(), StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var footer = embed.Footer?.Text ?? string.Empty;
+        var hasFooterMarker = footer.Contains("Pelican Keeper Status", StringComparison.OrdinalIgnoreCase)
+                              || footer.Contains("Last Updated", StringComparison.OrdinalIgnoreCase);
+
+        return hasFooterMarker && ((embed.Fields?.Count ?? 0) > 0 || !string.IsNullOrWhiteSpace(embed.Title));
+    }
+
+    private static void NormalizeCache()
+    {
+        Cache ??= new LiveMessageJsonStorage();
+        Cache.LiveStore ??= [];
+        Cache.ChannelLiveStore ??= [];
+        Cache.ServerLiveStore ??= [];
+        Cache.PaginatedLiveStore ??= [];
+        Cache.ChannelPaginatedLiveStore ??= [];
+        Cache.HostMetricsMessageIds ??= [];
+    }
+
+    private static string ChannelKey(DiscordChannel channel)
+        => channel.Id.ToString(CultureInfo.InvariantCulture);
+
+    private static string ServerKey(DiscordChannel channel, string serverUuid)
+        => $"{ChannelKey(channel)}:{serverUuid}";
 }

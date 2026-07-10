@@ -1,167 +1,76 @@
-# Pelican Keeper (Fork)
+# Pelican Keeper
 
-> **This is a fork of [SirZeeno/Pelican-Keeper](https://github.com/SirZeeno/Pelican-Keeper) with significant improvements and bug fixes.**
+Discord status bot for Pelican Panel servers.
 
-Discord bot for monitoring Pelican Panel game servers. Built with .NET 8.0.
-
-## Why This Fork?
-
-This fork focuses on reliability and production readiness:
-
-- **Working Player Counts**: Fixed Minecraft queries with proper fallback mechanisms
-- **Docker Compatibility**: Resolved networking issues for containerized deployments  
-- **Stable Configuration**: Pelican Panel environment variable support
-- **Better Testing**: Unit tests and CI/CD pipeline
-- **Easy Deployment**: Build scripts and importable Pelican egg
+This fork is tuned for Docker/Pelican installs, reliable message updates, host metrics, and working player counts across Minecraft, Source/A2S, RCON, Bedrock, and Palworld-style servers.
 
 ## Features
 
-- **Server Monitoring**: CPU, memory, disk, network, uptime tracking
-- **Player Counts**: Query live player counts (Minecraft Java/Bedrock, A2S, RCON)
-- **Display Modes**: Consolidated embed, per-server embeds, or paginated
-- **Auto-Updates**: Self-updating binary with GitHub release integration
-- **Server Control**: Start/stop servers via Discord buttons
-- **Auto-Shutdown**: Automatically stop empty servers after timeout
-- **Custom Templates**: Markdown-based embed customization
+- Server status embeds in consolidated, per-server, or paginated mode
+- Discord start/stop controls
+- Player counts through Minecraft ping, Bedrock ping, A2S, and RCON
+- Host CPU, memory, and disk metrics through node-exporter
+- Optional auto-shutdown for empty servers
+- GitHub release auto-update support
+- .NET 10 self-contained releases
 
-## Quick Start
+## Pelican Install
 
-### Install via Pelican Panel
+1. Import `egg-pelican-keeper.json`.
+2. Create a Pelican Keeper server.
+3. Set the required variables.
+4. Start the server.
 
-1. Import the egg: `egg-pelican-keeper.json`
-2. Create a new server with the egg
-3. Configure environment variables:
-   - `BOT_TOKEN` - Discord bot token
-   - `SERVER_URL` - Pelican Panel URL
-   - `CLIENT_TOKEN` - Client API key
-   - `SERVER_TOKEN` - Application API key
-   - `CHANNEL_IDS` - Discord channel ID
-   - `REPO_OWNER` - Your GitHub username (for forks)
-4. Start the server
+Required variables:
 
-### Manual Installation
+- `BOT_TOKEN`
+- `SERVER_URL`
+- `CLIENT_TOKEN`
+- `SERVER_TOKEN`
+- `CHANNEL_IDS`
 
-```bash
-# Download latest release
-curl -L https://github.com/Sersium/Pelican-Keeper/releases/latest/download/Pelican-Keeper-v[VERSION]-linux-x64.zip -o pelican-keeper.zip
-unzip pelican-keeper.zip
-cd Pelican-Keeper-linux-x64
+Useful optional variables:
 
-# Set environment variables (or export them)
-export BOT_TOKEN="your_discord_bot_token"
-export SERVER_URL="https://panel.example.com"
-export CLIENT_TOKEN="ptlc_your_client_key"
-export SERVER_TOKEN="ptla_your_app_key"
-export CHANNEL_IDS="1234567890123456789"
+- `REPO_OWNER=Sersium`
+- `REPO_NAME=Pelican-Keeper`
+- `AUTO_UPDATE=1`
+- `NOTIFICATION_CHANNEL_ID=...`
+- `HOST_METRICS_CHANNEL_ID=...`
+- `NODE_EXPORTER_URL=http://node-exporter:9100/metrics`
+- `HOST_METRICS_UPDATE_INTERVAL=3`
+- `MessageFormat=Consolidated`
+- `PlayerCountDisplay=1`
+- `DEBUG=1`
 
-# Run
-./"Pelican Keeper"
-```
+Pelican toggles use `1` for on and empty/`0` for off.
 
-## Configuration
+## Game Queries
 
-Configuration is done entirely via **environment variables** (no JSON files needed when running in containers).
+Edit `GamesToMonitor.json` to map eggs to protocols and variables. Supported protocols:
 
-### Required Environment Variables
+- `MinecraftJava`
+- `MinecraftBedrock`
+- `A2S`
+- `Rcon`
+- `Terraria`
 
-- `BOT_TOKEN` - Discord bot token
-- `SERVER_URL` - Pelican Panel URL (e.g., `https://panel.example.com`)
-- `CLIENT_TOKEN` - Pelican client API key (`ptlc_...`)
-- `SERVER_TOKEN` - Pelican application API key (`ptla_...`)
-- `CHANNEL_IDS` - Discord channel ID (comma-separated for multiple channels)
+For container-only games, prefer internal Docker DNS or variables:
 
-### Optional Environment Variables
+- `QueryHost`
+- `QueryHostVariable`
+- `RconHost`
+- `RconHostVariable`
 
-**Display Settings:**
-
-- `MESSAGEFORMAT` - Display mode: `Consolidated`, `PerServer`, `Paginated` (default: `Consolidated`)
-- `MESSAGESORTING` - Sort order: `Name`, `Players`, `Uptime` (default: `Name`)
-- `MESSAGESORTINGDIRECTION` - Sort direction: `Ascending`, `Descending` (default: `Ascending`)
-- `PLAYERCOUNTDISPLAY` - Enable game queries: `1`/`true` or `0`/`false`/`` (default: `true`)
-
-**Filtering:**
-
-- `IGNOREOFFLINESERVERS` - Hide offline servers: `1`/`0` (default: `false`)
-- `IGNOREINTERNALSERVERS` - Hide internal IP servers: `1`/`0` (default: `false`)
-- `SERVERSTOIGNORE` - Comma-separated server IDs to hide
-- `SERVERSTOMONITOR` - If set, only show these server IDs (comma-separated)
-
-**Auto-Shutdown:**
-
-- `AUTOMATICSHUTDOWN` - Enable auto-shutdown: `1`/`0` (default: `false`)
-- `SERVERSTOAUTOSHUTDOWN` - Server IDs to auto-shutdown (comma-separated)
-- `EMPTYSERVERTIMEOUT` - Timeout before shutdown (default: `00:01:00`)
-
-**Updates:**
-
-- `AUTO_UPDATE` - Enable self-updating: `1`/`0` (default: `false`)
-- `NOTIFYONUPDATE` - Notify on updates: `1`/`0` (default: `true`)
-- `REPO_OWNER` - GitHub username for fork updates (default: `Sersium`)
-- `REPO_NAME` - Repository name (default: `Pelican-Keeper`)
-
-**Other:**
-
-- `DEBUG` - Verbose logging: `1`/`0` (default: `false`)
-- `NOTIFICATION_CHANNEL_ID` - Optional notification channel ID
-
-**Host Metrics Monitoring (requires node-exporter container):**
-
-- `HOST_METRICS_CHANNEL_ID` - Discord channel ID for host system metrics display (CPU, RAM, disk usage)
-- `NODE_EXPORTER_URL` - Node-exporter Prometheus metrics endpoint (default: `http://node-exporter:9100/metrics`)
-
-**Note on NODE_EXPORTER_URL:** If the bot container cannot reach `node-exporter` at the default URL, you may need to:
-
-- Use the host IP address if running outside the same Docker compose network
-- Configure Docker networking to allow container-to-host communication  
-- Check that node-exporter is running and accessible from the bot's container network
-
-**Note:** Pelican Panel toggle values use `1` for ON, empty string for OFF.
-
-## Game Server Queries
-
-Supported protocols:
-
-- **Minecraft Java**: Server List Ping (SLP) + mcstatus.io fallback
-- **Minecraft Bedrock**: Bedrock query protocol
-- **Source Games**: A2S (Valve Source Query)
-- **Terraria**: RCON
-- **Custom**: Extendable via `IQueryService`
-- **Host Metrics**: CPU usage, RAM usage, storage disk/mount capacity (via node-exporter Prometheus endpoint)
-
-Configure game types in `GamesToMonitor.json`.
+The bot also tries sane fallbacks, including the Pelican server UUID as an internal Docker hostname.
 
 ## Development
 
-### Build
-
 ```bash
-./build.sh linux          # Linux x64
-./build.sh windows        # Windows x64  
-./build.sh all            # All platforms
+dotnet restore
+dotnet test --configuration Release
+./build.sh linux
 ```
-
-### Test
-
-```bash
-dotnet test "Pelican Keeper.sln"
-```
-
-### Project Structure
-
-```
-Pelican Keeper/
-├── Core/           # Context, configuration
-├── Models/         # Data structures
-├── Discord/        # Bot, embeds, interactions
-├── Pelican/        # Panel API client
-├── Query/          # Game server protocols
-└── Utilities/      # Helpers, logging
-```
-
-## License
-
-See [LICENSE](LICENSE) file for details.
 
 ## Credits
 
-Original work by [SirZeeno](https://github.com/SirZeeno/Pelican-Keeper)
+Forked from [SirZeeno/Pelican-Keeper](https://github.com/SirZeeno/Pelican-Keeper).
